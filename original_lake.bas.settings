@@ -1,20 +1,26 @@
 <?xml version="1.0" encoding="utf-16"?>
 <DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <FindHistory>
-    <string>OFF</string>
-    <string>MODE1_REG</string>
-    <string>servoNumber</string>
-    <string>N2400</string>
+    <string>Servo_ON</string>
+    <string />
+    <string>servo_off</string>
+    <string>servo_on</string>
+    <string>open_outlet</string>
+    <string>I2CBYTE</string>
+    <string>Servo_address</string>
+    <string>Open_Outlet_Valve</string>
+    <string>Outlet_open_position</string>
+    <string>Open_Outlet_valve</string>
   </FindHistory>
-  <ReplaceHistory>
-    <string>N9600_8</string>
-  </ReplaceHistory>
+  <ReplaceHistory />
   <ReplaceSearchHistory />
   <Bookmarks />
-  <BreakPoints />
+  <BreakPoints>
+    <int>462</int>
+  </BreakPoints>
   <SelectedLine>0</SelectedLine>
   <SelectedColumn>0</SelectedColumn>
-  <CaretOffset>422</CaretOffset>
+  <CaretOffset>15426</CaretOffset>
   <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
   <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
   <HorizontalSplitterPosition>0</HorizontalSplitterPosition>
