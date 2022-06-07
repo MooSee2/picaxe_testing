@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-16"?>
 <DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <FindHistory>
+    <string>TB6612_PWM_port</string>
+    <string />
+    <string>I2C_pin</string>
+    <string>TB6612_enable</string>
     <string>OFF</string>
     <string>MODE1_REG</string>
     <string>servoNumber</string>
@@ -14,7 +18,7 @@
   <BreakPoints />
   <SelectedLine>0</SelectedLine>
   <SelectedColumn>0</SelectedColumn>
-  <CaretOffset>422</CaretOffset>
+  <CaretOffset>5406</CaretOffset>
   <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
   <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
   <HorizontalSplitterPosition>0</HorizontalSplitterPosition>
