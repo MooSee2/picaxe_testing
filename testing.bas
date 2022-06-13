@@ -2,6 +2,8 @@
 
 #PICAXE 28X2
 #slot 0
+'setfreq m8
+pause 1000
 
 ' Outlet valve open/close positions:  150/250
 ' Always use sperate 6v for servos as they generate a lot of electrical noise.
@@ -42,49 +44,50 @@ init:
     let pulse_time_OFF = 200
     let servo_pos = 255
     pause 500
-    gosub I2C_ON
+    'gosub I2C_ON
     ' Move main servo to closed position
-    servo servo_IO, 255
-    servopos servo_IO, 255
+    'servo servo_IO, 255
+    'servopos servo_IO, 255
     pause 800
-    servo servo_IO, 255
+    'servo servo_IO, 255
     ' Move outlet valve to closed position
-    servo Outlet_IO, 250
-    servopos Outlet_IO, 250
+    'servo Outlet_IO, 250
+    'servopos Outlet_IO, 250
     pause 800
-    servo Outlet_IO, 250
-    gosub HI2C_init
-    gosub I2C_OFF
-    gosub clear_terminal
+    'servo Outlet_IO, 250
+    'gosub HI2C_init
+    'gosub I2C_OFF
+    disablebod
+    'gosub clear_terminal
 
 clear_terminal:
-    SerOut b.7, N9600_8, (CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR)
-    SerOut b.7, N9600_8, ("------------------------------------------------")
+    SerOut A.4, N9600_8, (CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR)
+    SerOut A.4, N9600_8, ("------------------------------------------------")
 
 main_menu:
-    SerOut b.7, N9600_8, (CR, "--- Main Menu ---", CR)
-    SerOut b.7, N9600_8, (_
+    SerOut 7, N9600, (CR, "--- Main Menu ---", CR)
+    SerOut A.4, N9600_8, (_
         "Command | Action", CR, _
         "----------------", CR, _
         "1       | Return value at b0", CR, _
         "2       | Testing menu", CR, _
         "254     | Reset picaxe", CR, CR)
-    SerOut b.7, N9600_8, ("Enter q<command>:  ")
-    SerIn b.6, N9600_8, ("q"), #b0
-    SerOut b.7, N9600_8, (#b0, CR, CR, LF)
+    SerOut A.4, N9600_8, ("Enter q<command>:  ")
+    SerIn 6, N9600, ("q"), #b0
+    SerOut A.4, N9600_8, (#b0, CR, CR, LF)
     if b0 = 1 then
-        SerOut b.7, N9600_8, (#b0, CR, LF)
+        SerOut A.4, N9600_8, (#b0, CR, LF)
     elseif b0 = 2 then
         goto testing_menu
     elseif b0 = 254 then
         reset
     else 
-        SerOut b.7, N9600_8, (CR, "Invalid input:  ", #b0, CR, LF)
+        SerOut A.4, N9600_8, (CR, "Invalid input:  ", #b0, CR, LF)
     endif
     goto main_menu
 
 testing_menu:
-    SerOut b.7, N9600_8, (_
+    SerOut A.4, N9600_8, (_
         "--- Testing Menu ---", CR, CR, _
         "Command | Action", CR, _
         "----------------", CR, _
@@ -95,25 +98,25 @@ testing_menu:
         "5       | Close outlet", CR, _
         "99      | Return to Main", CR, _
         "254     | Reset picaxe", CR, CR)
-    SerOut b.7, N9600_8, ("Enter q<command>:  ")
+    SerOut A.4, N9600_8, ("Enter q<command>:  ")
     SerIn b.6, N9600_8, ("q"), #b0
-    SerOut b.7, N9600_8, (#b0, CR)
+    SerOut A.4, N9600_8, (#b0, CR)
     if b0 = 1 then
-        SerOut b.7, N9600_8, ("Enter q<pump time>:  ", CR)
+        SerOut A.4, N9600_8, ("Enter q<pump time>:  ", CR)
         SerIn b.6, N9600_8, ("q"), #pump_runtime
-        SerOut b.7, N9600_8, ("Pumping ", #pump_runtime, " seconds", CR)
+        SerOut A.4, N9600_8, ("Pumping ", #pump_runtime, " seconds", CR)
         gosub run_pump
     elseif b0 = 2 then
         gosub manifold_flush
     elseif b0 = 3 then
         do
-            SerOut b.7, N9600_8, ("Move to slot q<0-8, 99=exit>:")
+            SerOut A.4, N9600_8, ("Move to slot q<0-8, 99=exit>:")
             SerIn b.6, N9600_8, ("q"), #slot_num
-            SerOut b.7, N9600_8, (#slot_num, CR)
+            SerOut A.4, N9600_8, (#slot_num, CR)
             if slot_num = 99 then
                 goto testing_menu
             elseif slot_num > 8 then
-                SerOut b.7, N9600_8, ("Invalid slot!", CR)
+                SerOut A.4, N9600_8, ("Invalid slot!", CR)
             elseif slot_num <= 8 then
                 gosub move_servo
             endif
@@ -125,7 +128,7 @@ testing_menu:
     elseif b0 = 99 then
         goto main_menu
     else 
-        SerOut b.7, N9600_8, (CR, "Invalid input:  ", #b0, CR, LF)
+        SerOut A.4, N9600_8, (CR, "Invalid input:  ", #b0, CR, LF)
     endif
     goto testing_menu
 
@@ -158,7 +161,7 @@ Servo_ON: ' initialize servo I2C and turn on 6V LDO_6V
 return
 
 cpen_outlet:
-    SerOut b.7, N9600_8, (CR, "Opening outlet", CR)
+    SerOut A.4, N9600_8, (CR, "Opening outlet", CR)
     gosub I2C_ON
     servopos Outlet_IO, 150 ; initialise servo
     pause 800
@@ -169,7 +172,7 @@ return
 
 close_outlet:
     ' Closed is default position set in init.
-    SerOut b.7, N9600_8, (CR, "Closing outlet", CR)
+    SerOut A.4, N9600_8, (CR, "Closing outlet", CR)
     gosub I2C_ON
     servopos Outlet_IO, 250
     pause 800
@@ -190,7 +193,7 @@ run_pump:
 return
 
 pulse_pump:
-    SerOut b.7, N9600_8, ("Enter q<pulses>:  ", CR)
+    SerOut A.4, N9600_8, ("Enter q<pulses>:  ", CR)
     SerIn b.6, N9600_8, ("q"), #Sample_pulses ' Move this line to when asking for user input for sample pulses
     for i = 1 to Sample_pulses
         high 4
@@ -203,10 +206,10 @@ pulse_pump:
 return
 
 manifold_flush:
-    SerOut b.7, N9600_8, ("Flush manifold")
+    SerOut A.4, N9600_8, ("Flush manifold")
     gosub cpen_outlet
     gosub run_pump
-    SerOut b.7, N9600_8, ("Flushing manifold", CR)
+    SerOut A.4, N9600_8, ("Flushing manifold", CR)
     gosub close_outlet
 return
 
