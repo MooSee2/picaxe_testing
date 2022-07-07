@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-16"?>
 <DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <FindHistory>
+    <string>b.7</string>
+    <string>clear_terminal</string>
     <string>Z</string>
     <string>TB6612_PWM_port</string>
     <string />
@@ -9,9 +11,9 @@
     <string>OFF</string>
     <string>MODE1_REG</string>
     <string>servoNumber</string>
-    <string>N2400</string>
   </FindHistory>
   <ReplaceHistory>
+    <string>A.4</string>
     <string>N9600_8</string>
   </ReplaceHistory>
   <ReplaceSearchHistory />
@@ -19,7 +21,11 @@
   <BreakPoints />
   <SelectedLine>0</SelectedLine>
   <SelectedColumn>0</SelectedColumn>
+<<<<<<< HEAD
   <CaretOffset>3909</CaretOffset>
+=======
+  <CaretOffset>2081</CaretOffset>
+>>>>>>> bd7f79abfbcd7f64e9f59a60356e6648a530b003
   <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
   <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
   <HorizontalSplitterPosition>0</HorizontalSplitterPosition>
