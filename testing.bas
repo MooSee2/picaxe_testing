@@ -129,10 +129,6 @@ testing_menu:
     endif
     goto testing_menu
 
-I2C_ON:     'turn on I2C, +V pin defined by symbol at top of program
-    high I2C_pin
-    pause 100
-return
 
 I2C_OFF:
     low I2C_pin
