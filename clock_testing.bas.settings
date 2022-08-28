@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-16"?>
+<DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <FindHistory>
+    <string>D5</string>
+    <string>D4</string>
+    <string>D3</string>
+    <string>D2</string>
+    <string>D1</string>
+    <string>D0</string>
+  </FindHistory>
+  <ReplaceHistory>
+    <string>day_b2</string>
+    <string>day_b1</string>
+    <string>date_b2</string>
+    <string>date_b1</string>
+    <string>year_b2</string>
+    <string>year_b1</string>
+  </ReplaceHistory>
+  <ReplaceSearchHistory />
+  <Bookmarks />
+  <BreakPoints />
+  <SelectedLine>0</SelectedLine>
+  <SelectedColumn>0</SelectedColumn>
+  <CaretOffset>2289</CaretOffset>
+  <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
+  <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
+  <HorizontalSplitterPosition>0</HorizontalSplitterPosition>
+</DocumentSettings>

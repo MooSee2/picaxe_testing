@@ -1,13 +1,34 @@
 <?xml version="1.0" encoding="utf-16"?>
 <DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <FindHistory />
-  <ReplaceHistory />
+  <FindHistory>
+    <string>("q"), #</string>
+    <string>control</string>
+    <string>setup_clock</string>
+    <string>manual_slot_selection</string>
+    <string>enter_slot_num</string>
+    <string>Sample_pulses</string>
+    <string>b43</string>
+    <string>pulse_time_off</string>
+    <string>SerOut out_IO, baud_IO,</string>
+    <string>SerIn in_IO, baud_IO,</string>
+  </FindHistory>
+  <ReplaceHistory>
+    <string />
+    <string>enter_slot</string>
+    <string>enter_pulses</string>
+    <string>sample_pulses</string>
+    <string>serTXD</string>
+    <string>serRXD ("q"), #b0</string>
+    <string>baud_IO</string>
+    <string>out_IO</string>
+    <string>N4800</string>
+  </ReplaceHistory>
   <ReplaceSearchHistory />
   <Bookmarks />
   <BreakPoints />
   <SelectedLine>0</SelectedLine>
   <SelectedColumn>0</SelectedColumn>
-  <CaretOffset>473</CaretOffset>
+  <CaretOffset>1583</CaretOffset>
   <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
   <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
   <HorizontalSplitterPosition>0</HorizontalSplitterPosition>
