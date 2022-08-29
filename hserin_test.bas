@@ -13,7 +13,6 @@ symbol Outlet_IO = B.1
 symbol servo_IO = B.3
 
 ' Variable assinmends
-symbol second = b2
 symbol minute = b3
 symbol hour = b4
 symbol day = b5
@@ -23,24 +22,28 @@ symbol year = b8
 symbol control = b9
 symbol year_b1 = b10
 symbol year_b0 = b11
-symbol month_b0 = b20
-symbol month_b1 = b21
-symbol date_b1 = b12
-symbol date_b0 = b13
-symbol day_b1 = b14
-symbol day_b0 = b15
-symbol hour_b1 = b16
-symbol hour_b0 = b17
-symbol minute_b0 = b18
-symbol minute_b1 = b19
-symbol pump_runtime = b10
-symbol pulse_time = b41
-symbol sample_pulses = b44
-symbol counter = b50
-symbol slot_num = b45
-symbol servo_pos = b46
+symbol month_b0 = b12
+symbol month_b1 = b13
+symbol date_b1 = b14
+symbol date_b0 = b15
+symbol day_b1 = b16
+symbol day_b0 = b17
+symbol hour_b1 = b18
+symbol hour_b0 = b19
+symbol minute_b0 = b20
+symbol minute_b1 = b21
+symbol pump_runtime = b22
+symbol pulse_time = b23
+symbol sample_pulses = b24
+symbol slot_num = b25
+symbol servo_pos = b26
+symbol subsample_count = b27
+symbol finish = b28
+symbol current_slot = b29
+symbol sample_set = b30
 symbol temp = b47  ' temp var for calculations
 symbol i = b48  ' use in counter loops only.
+symbol counter = b50
 symbol pulse_time_ON = b42
 symbol pulse_time_OFF = w0
 
@@ -51,8 +54,6 @@ init:
     let pulse_time_ON = 100
     let pulse_time_OFF = 900
     let sample_pulses = 30
-    let slot_num = 0
-    let second = $5
     let minute = $1
     let hour = $20
     let day = $1
@@ -60,8 +61,9 @@ init:
     let month = $6
     let year = $22
     let control = %00010000 ' For RTC
-    HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte
-    hi2cout 0,(second , minute, hour, day, date, month, year, control)
+    gosub init_clock
+    hi2cout 0,($0 , minute, hour, day, date, month, year, control) ' Set Time
+    hi2cout 8,($15, $15, day, $3, control) ' Set Alarm
     pause 500
 
 clear_terminal:
@@ -75,8 +77,9 @@ main_menu:
         "----------------", CR, _
         "1       | Return value at b0", CR, _
         "2       | Testing menu", CR, _
-        "3       | Set RTC", CR, _
-        "4       | Display RTC time", CR, _
+        "3       | Set Time/Alarm", CR, _
+        "4       | Display Time/Alarm", CR, _
+        "5       | Begin Sampling", CR, _
         "254     | Reset picaxe", CR, CR)
     serTXD ("Enter <command>:  ")
     serRXD b0
@@ -86,15 +89,91 @@ main_menu:
     elseif b0 = 2 then
         goto testing_menu
     elseif b0 = 3 then
-        gosub setup_clock
+        gosub set_clock
     elseif b0 = 4 then
         gosub display_time
+    elseif b0 = 5 then
+        gosub begin_sampling
     elseif b0 = 254 then
         reset
     else 
         serTXD (CR, "Invalid input:  ", #b0, CR, LF)
     endif
     goto main_menu
+
+begin_sampling:
+    serTXD (CR, "---Begin Sampling---", CR, LF)
+    serTXD ("Enter start Hour ex: 09", CR)
+    serRXD hour
+    serTXD ("Enter start Minute ex: 05", CR)
+    serRXD minute
+    minute = bintobcd minute
+    hour = bintobcd hour
+    gosub init_clock
+    hi2cout 7,($0, minute, hour, day, date, month, year, control) ' Set Alarm
+
+    let subsample_count = 7 ' days
+    let slot_num = 0 ' 0-8 slots
+    let sample_set = 1 ' 1-4 sets RA/FA
+    let finish = 0 ' Finish = 1 means sampling is complete and program sleeps.
+    Low C.2 ' Set C.2 off, i.e. Alarm not active, program should sleep
+    
+    Do while finish = 0
+        if pinC.2 = 0 then ' Alarm OFF, so sleep
+            sleep 0
+        elseif pinC.2 = 1 AND sample_set = 1 then
+            if subsample_count > 0 then
+                gosub collect_subsample
+            elseif subsample_count <= 0 then
+                sample_set = 2
+            endif            
+            low C.2
+        elseif pinC.2 = 1 AND sample_set = 2 then
+            if subsample_count > 0 then
+                gosub collect_subsample
+            elseif subsample_count <= 0 then
+                sample_set = 3
+            endif            
+            low C.2
+        elseif pinC.2 = 1 AND sample_set = 3 then
+            if subsample_count > 0 then
+                gosub collect_subsample
+            elseif subsample_count <= 0 then
+                sample_set = 4
+            endif            
+            low C.2
+        elseif pinC.2 = 1 AND sample_set = 4 then
+            if subsample_count > 0 then
+                gosub collect_subsample
+            elseif subsample_count <= 0 then
+                sample_set = 99
+            endif            
+            low C.2
+        else ' If sample set >= 5, then end sampling
+            sleep 0
+        endif
+    loop
+
+collect_sample:
+    gosub move_servo
+    gosub cpen_outlet
+    gosub run_pump
+    gosub close_outlet
+    gosub pulse_pump
+    return
+
+collect_subsample:
+    inc slot_num
+    gosub collect_sample
+    inc slot_num
+    gosub collect_sample
+    slot_num = 0
+    gosub move_servo
+    dec subsample_count
+
+init_clock:
+    HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte
+    return
 
 testing_menu:
     serTXD (CR, _
@@ -154,14 +233,36 @@ testing_menu:
     goto testing_menu
 
 '  Clock subroutines
-setup_clock:
-    gosub enter_clock_time
-    HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte
-    hi2cout 0,(second , minute, hour, day, date, month, year, control)
+
+rtc_to_ascii:
+' Read RTC data from DS3231
+    BcdTOASCII year , year_b1, year_b0
+    BcdTOASCII month, month_b1, month_b0
+    BcdTOASCII date , date_b1, date_b0
+    BcdTOASCII hour, hour_b1, hour_b0
+    BcdTOASCII minute , minute_b1, minute_b0
     return
 
-'  Get user entry subroutines
+set_clock:
+' Set Time/Alarm
+    serTXD ("Program: 1 = Time, 2 = Alarm", CR, LF)
+    serRXD b0
+    if b0 = 1 then
+        serTXD ("Programming Time", CR, LF)
+        gosub enter_clock_time
+        hi2cout 0,($0, minute, hour, day, date, month, year, control) ' Set Time
+    elseif b0 = 2 then
+        serTXD ("Programming Alarm", CR, LF)
+        gosub enter_clock_time
+        hi2cout 7,($0, minute, hour, day, date, month, year, control) ' Set Alarm
+    else
+        serTXD ("Invalid entry", CR, LF)
+        return
+    endif
+    return
+
 enter_clock_time:
+' Get input from user to enter Time/Alarm.
     serTXD ("hour ex: 09", CR)
     serRXD hour
     serTXD ("minute ex: 05", CR)
@@ -175,7 +276,7 @@ enter_clock_time:
     serTXD ("day ex: Monday = 2, Tuesday = 3", CR)
     serRXD day
     serTXD ("Is this the correct time?: ", "20", #year, "/", #month, "/", #date, " ", #hour, ":", #minute, "  day = ", #day, CR)
-    serTXD ("< 1 = yes 0 = no >")
+    serTXD ("1 = yes 0 = no")
     serRXD b0
     if b0 = 0 then
         gosub enter_clock_time
@@ -188,19 +289,28 @@ enter_clock_time:
         day = bintobcd day
         pause 75
         return
+    else
+        serTXD ("Invalid entry", CR, LF)
+        return
     endif
 
 display_time:
-    pause 1000
-    ReadRegisters:
-        HI2Cin  0 , (second, minute, hour, day, date, month, year) ' Read from DS3231
-    ClockDisplay:
-        BcdTOASCII year , year_b1, year_b0
-        BcdTOASCII month, month_b1, month_b0
-        BcdTOASCII date , date_b1, date_b0
-        BcdTOASCII hour, hour_b1, hour_b0
-        BcdTOASCII minute , minute_b1, minute_b0
-        sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
+' Display Time/Alarm to terminal
+    serTXD ("Display: 1 = Time 2 = Alarm", CR, LF)
+    serRXD b0
+    ptr = 0
+    if b0 = 2 then
+        serTXD ("Current alarm is: ")
+        HI2Cin  8, (minute, hour, @ptr, date)
+    elseif b0 = 1 then
+        serTXD ("Current time is: ")
+        HI2Cin  1, (minute, hour, @ptr, date, month, year)
+    else
+        serTXD ("Invalid entry", CR, LF)
+        return
+    endif
+    gosub rtc_to_ascii
+    sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
   return
 
 enter_pump_time:
@@ -270,14 +380,14 @@ move_servo:
     ' Move main servo to slot number.
     ' Always move to closed position before changing position
     serTXD ("Moving main servo to ", #slot_num, CR)
-    servopos servo_IO, 255
+    servopos servo_IO, 255 ' Make sure servo is closed
     'servo servo_IO, 255
-    pause 750
+    pause 750 ' Wait for servo to move to closed position
     gosub calc_servo_pos
     serTXD ("At position ", #servo_pos, CR)
     'servo servo_IO, servo_pos
-    servopos servo_IO, servo_pos
-    pause 750
+    servopos servo_IO, servo_pos ' Move servo to slot_num
+    pause 750 ' Wait for servo to move to slot_num
 return
 
 cpen_outlet:

@@ -802,19 +802,19 @@ gosub I2C_ON ' turn on I2C bus board
 ptr = 0     'reset pointer to scrachpad address 0 for time values
 hi2csetup i2cmaster,RTC_address,i2cslow,i2cbyte ' set i2c for DS1340/DS3231
  for I = 5 to 0 step -1       ' MD, read from registers 5,4
-if I=3 then       ' skip register 3 (DOW), read register 6 (year)
+    if I=3 then       ' skip register 3 (DOW), read register 6 (year)
            let I=6     ' HMS, read from registers 2,1,0
-      endif
+    endif
 
-hi2cin I,(b0)     ' get time from RTC, position I
-bcdtoascii b0,b1,b2     ' convert BCD to ASCII
-@ptr=b1     ' write to scratchpad
-inc ptr
-@ptr=b2
-inc ptr
-if I = 6 then
-let I = 3   ' reset J after reading year to read HH:MM:SS
-endif
+    hi2cin I,(b0)     ' get time from RTC, position I
+    bcdtoascii b0,@ptr,b2     ' convert BCD to ASCII
+    @ptr=b1     ' write to scratchpad
+    inc ptr
+    @ptr=b2
+    inc ptr
+    if I = 6 then
+    let I = 3   ' reset J after reading year to read HH:MM:SS
+    endif
  next I
  
 hi2cin 0,(Second, Minute, Hour)     ' get second,minute, hour, day for various counters, skips #3 DOW

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-16"?>
 <DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <FindHistory>
+    <string>HI2Csetup</string>
+    <string>counter</string>
     <string>("q"), #</string>
     <string>control</string>
     <string>setup_clock</string>
@@ -9,8 +11,6 @@
     <string>Sample_pulses</string>
     <string>b43</string>
     <string>pulse_time_off</string>
-    <string>SerOut out_IO, baud_IO,</string>
-    <string>SerIn in_IO, baud_IO,</string>
   </FindHistory>
   <ReplaceHistory>
     <string />
@@ -28,7 +28,7 @@
   <BreakPoints />
   <SelectedLine>0</SelectedLine>
   <SelectedColumn>0</SelectedColumn>
-  <CaretOffset>1583</CaretOffset>
+  <CaretOffset>2878</CaretOffset>
   <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
   <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
   <HorizontalSplitterPosition>0</HorizontalSplitterPosition>

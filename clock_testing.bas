@@ -4,7 +4,6 @@
 setfreq m8
 SYMBOL SQWpin = C.2
 
-SYMBOL second = b2
 SYMBOL minute = b3
 SYMBOL hour = b4
 SYMBOL day = b5
@@ -25,18 +24,20 @@ SYMBOL hour_b0 = b17
 SYMBOL minute_b0 = b18
 SYMBOL minute_b1 = b19
 
-let second = $0
-let minute = $1
-let hour = $2
-let day = $3
-let date = $26
-let month = $6
+' Set default time info, but don't in main program, clock should be set and left until battery reset or manual change
+let minute = $0
+let hour = $12
+let day = $1
+let date = $28
+let month = $8
 let year = $22
 let control = %00010000
 
 Initialize:
-HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte
-hi2cout 0,(second , minute, hour, day, date, month, year, control)
+' Only initialize clock on startup, don't set time or alarm.
+HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte ' Initialize clock
+hi2cout 0,($0 , minute, hour, day, date, month, year, control) ' Set Time
+hi2cout 8,($15, $15, day, $3, control) ' Set Alarm
 
 main_menu:
     serTXD (CR, "--- Main Menu ---", CR)
@@ -44,24 +45,18 @@ main_menu:
         "Command | Action", CR, _
         "----------------", CR, _
         "1       | Return value at b0", CR, _
-        "3       | Set RTC", CR, _
-        "4       | Display RTC time", CR, _
-        "5       | Set_alarm", CR, _
-        "6       | Display alarm", CR, _
+        "2       | Set Clock/Alarm", CR, _
+        "4       | Display Time", CR, _
         "254     | Reset picaxe", CR, CR)
     serTXD ("Enter q<command>:  ")
     serRXD b0
     serTXD (#b0, CR, CR, LF)
     if b0 = 1 then
         serTXD (#b0, CR, LF)
-    elseif b0 = 3 then
-        gosub setup_clock
+    elseif b0 = 2 then
+        gosub set_clock ' Set Time/Alarm
     elseif b0 = 4 then
-        gosub display_time
-    elseif b0 = 5 then
-        gosub set_alarm
-    elseif b0 = 6 then
-        gosub display_alarm
+        gosub display_time ' Display Time/Alarm
     elseif b0 = 254 then
         reset
     else 
@@ -69,48 +64,49 @@ main_menu:
     endif
     goto main_menu
 
-set_alarm:
-    HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte
-    hi2cout 7,($1 ,$1 ,$1 , $1, $1, $1, $22, control)
+rtc_to_ascii:
+' Read RTC data from DS3231
+    BcdTOASCII year , year_b1, year_b0
+    BcdTOASCII month, month_b1, month_b0
+    BcdTOASCII date , date_b1, date_b0
+    BcdTOASCII hour, hour_b1, hour_b0
+    BcdTOASCII minute , minute_b1, minute_b0
     return
 
-display_alarm:
-    pause 1000
-    HI2Cin  7 , (second, minute, hour, day, date, month, year) ' Read from DS3231
-    AlarmDisplay:
-        BcdTOASCII year , year_b1, year_b0
-        BcdTOASCII month, month_b1, month_b0
-        BcdTOASCII date , date_b1, date_b0
-        BcdTOASCII hour, hour_b1, hour_b0
-        BcdTOASCII minute , minute_b1, minute_b0
-        sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
-    return
-
-enter_hibernate:
-    'setint SQWpin, SQWpin, C
-    sleep 0
-
-setup_clock:
-    gosub enter_clock_time
-    HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte
-    hi2cout 0,(second , minute, hour, day, date, month, year, control)
+set_clock:
+' Set Time/Alarm
+    serTXD ("Program: 1 = Time, 2 = Alarm", CR, LF)
+    serRXD b0
+    if b0 = 1 then
+        serTXD ("Programming Time", CR, LF)
+        gosub enter_clock_time
+        hi2cout 0,($0, minute, hour, day, date, month, year, control) ' Set Time
+    elseif b0 = 2 then
+        serTXD ("Programming Alarm", CR, LF)
+        gosub enter_clock_time
+        hi2cout 7,($0, minute, hour, day, date, month, year, control) ' Set Alarm
+    else
+        serTXD ("Invalid entry", CR, LF)
+        return
+    endif
     return
 
 enter_clock_time:
-    serTXD ("q<hour> ex: 09", CR)
+' Get input from user to enter Time/Alarm.
+    serTXD ("hour ex: 09", CR)
     serRXD hour
-    serTXD ("q<minute> ex: 05", CR)
+    serTXD ("minute ex: 05", CR)
     serRXD minute
-    serTXD ("q<year> ex: 22", CR)
+    serTXD ("year ex: 22", CR)
     serRXD year
-    serTXD ("q<month> ex: 01", CR)
+    serTXD ("month ex: 01", CR)
     serRXD month
-    serTXD ("q<date> ex: 06", CR)
+    serTXD ("date ex: 06", CR)
     serRXD date
-    serTXD ("q<day> ex: Monday = 2, Tuesday = 3", CR)
+    serTXD ("day ex: Monday = 2, Tuesday = 3", CR)
     serRXD day
     serTXD ("Is this the correct time?: ", "20", #year, "/", #month, "/", #date, " ", #hour, ":", #minute, "  day = ", #day, CR)
-    serTXD ("q< 1 = yes 0 = no >")
+    serTXD ("1 = yes 0 = no")
     serRXD b0
     if b0 = 0 then
         gosub enter_clock_time
@@ -123,18 +119,28 @@ enter_clock_time:
         day = bintobcd day
         pause 75
         return
+    else
+        serTXD ("Invalid entry", CR, LF)
+        return
     endif
 
 display_time:
-    pause 1000
-    HI2Cin  0 , (second, minute, hour, day, date, month, year) ' Read from DS3231
-    ClockDisplay:
-        BcdTOASCII year , year_b1, year_b0
-        BcdTOASCII month, month_b1, month_b0
-        BcdTOASCII date , date_b1, date_b0
-        BcdTOASCII hour, hour_b1, hour_b0
-        BcdTOASCII minute , minute_b1, minute_b0
-        sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
+' Display Time/Alarm to terminal
+    serTXD ("Display: 1 = Time 2 = Alarm", CR, LF)
+    serRXD b0
+    ptr = 0
+    if b0 = 2 then
+        serTXD ("Current alarm is: ")
+        HI2Cin  8, (minute, hour, @ptr, date)
+    elseif b0 = 1 then
+        serTXD ("Current time is: ")
+        HI2Cin  1, (minute, hour, @ptr, date, month, year)
+    else
+        serTXD ("Invalid entry", CR, LF)
+        return
+    endif
+    gosub rtc_to_ascii
+    sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
   return
 
 ;    PAUSE 1000
