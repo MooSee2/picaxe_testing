@@ -1,8 +1,9 @@
 ' DS3213 clock from https://picaxeforum.co.uk/threads/ds3231-code-examples.18694/
 #PICAXE 28X2
+#Terminal 9600
+#no_table
 #slot 0
 setfreq m8
-SYMBOL SQWpin = C.2
 
 SYMBOL minute = b3
 SYMBOL hour = b4
@@ -23,25 +24,32 @@ SYMBOL hour_b1 = b16
 SYMBOL hour_b0 = b17
 SYMBOL minute_b0 = b18
 SYMBOL minute_b1 = b19
+symbol datain = b20
 
 ' Set default time info, but don't in main program, clock should be set and left until battery reset or manual change
 let minute = $0
 let hour = $12 ' Set hour
-setbit hour, 6 ' Set bit 6 in hour to 1 to set 24hr mode in RTC
+'setbit hour, 6 ' Set bit 6 in hour to 1 to set 24hr mode in RTC
 let day = $1
 let date = $28
 let month = $8
 let year = $22
 let control = $12
-setbit control, 7 ' Set bit 7 of alarm hour to 1 to enable once per 24 hour sampling.
+'setbit control, 7 ' Set bit 7 of alarm hour to 1 to enable once per 24 hour sampling.
 
 Initialize:
 ' Only initialize clock on startup, don't set time or alarm.
 HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte ' Initialize clock
-hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time
-hi2cout $08,($2, control, day, $28) ' Set Alarm
-hintsetup %00000010
-setint %00000010, %00000010, C
+hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time, seconds default to 00.
+hi2cout $0A, (%00000000) ' Set DY/DT to 0 for date.  1 = day
+hi2cout $07,($0, $1, $12, %10101000) ' Set Alarm SS, MM, HH, A1M4 register to 1: Alarm when hours, minutes, and seconds match
+hi2cout $0E, (%00000101, %00000000) ' Set alarm 1 active, interrupts active, and clear control/status
+
+
+hintsetup   %00000100
+setintflags %00000100,%00000100
+
+'SETINT %10000000, %10000000, C ' Set interrupt on Pin C.7 high
 
 main_menu:
     serTXD (CR, "--- Main Menu ---", CR)
@@ -52,6 +60,7 @@ main_menu:
         "2       | Set Clock/Alarm", CR, _
         "4       | Display Time", CR, _
         "5       | alarm_monitor", CR, _
+        "6       | Display alarm bus", CR, _
         "254     | Reset picaxe", CR, CR)
     serTXD ("Enter q<command>:  ")
     serRXD b0
@@ -64,6 +73,8 @@ main_menu:
         gosub display_time ' Display Time/Alarm
     elseif b0 = 5 then
         gosub alarm_monitor ' Display Time/Alarm
+    elseif b0 = 6 then
+        gosub read_alarm_bus
     elseif b0 = 254 then
         reset
     else 
@@ -77,13 +88,22 @@ alarm_monitor:
     serTXD ("Waking", CR, LF)
     return
 
+read_alarm_bus:
+    hi2cin $0E, (b21, b22)
+    b21 = bintobcd b21
+    b22 = bintobcd b22
+    'b24 = b21 / 16 * $FA + b21
+    'b25 = b22 / 16 * $FA + b22
+    sertxd( b24, ":", b25, cr, lf )
+    return
+
 rtc_to_ascii:
 ' Read RTC data from DS3231
     BcdTOASCII year , year_b1, year_b0
     BcdTOASCII month, month_b1, month_b0
+    clearbit date, 7 ' Set bit 6 in hour to 0 to to read correctly from RTC
     BcdTOASCII date , date_b1, date_b0
-    clearbit hour, 6 ' Set bit 6 in hour to 0 to to read correctly from RTC
-    clearbit hour, 7 ' Set bit 6 in hour to 0 to to read correctly from RTC
+    'clearbit hour, 6 ' Set bit 6 in hour to 0 to to read correctly from RTC
     BcdTOASCII hour, hour_b1, hour_b0
     BcdTOASCII minute , minute_b1, minute_b0
     return
@@ -126,7 +146,7 @@ enter_clock_time:
     if b0 = 0 then
         gosub enter_clock_time
     elseif b0 = 1 then
-        setbit hour, 6 ' Set bit 6 in hour to 1 to set 24hr mode in RTC
+        'setbit hour, 6 ' Set bit 6 in hour to 1 to set 24hr mode in RTC
         hour = bintobcd hour
         minute = bintobcd minute
         year = bintobcd year
@@ -147,7 +167,7 @@ display_time:
     ptr = 0
     if b0 = 2 then
         serTXD ("Current alarm is: ")
-        HI2Cin  8, (minute, hour, @ptr, date)
+        HI2Cin  8, (minute, hour, date)
     elseif b0 = 1 then
         serTXD ("Current time is: ")
         HI2Cin  1, (minute, hour, @ptr, date, month, year)
@@ -161,16 +181,9 @@ display_time:
 
 interrupt:
     serTXD ("Interrupted", CR, LF)
+    flag2 = 0
+    setintflags %00000100,%00000100
+    HI2CIN  $0F, (DataIn) ; Fetch the Control/Status register at location $0F
+    datain = DataIn AND %11111100 ; clear the two alarm bits bit1 and bit0 
+    HI2COUT $0F, (DataIn) ;Write back to clear interrupt flag
     return
-
-;    PAUSE 1000
-;    ReadRegisters:
-;        HI2Cin  0 , (second, minute, hour, day, date, month, year) ' Read from DS3231
-;
-;    ClockDisplay:
-;        BcdTOASCII year , year_b1, year_b0
-;        BcdTOASCII month, month_b1, month_b0
-;        BcdTOASCII date , date_b1, date_b0
-;        BcdTOASCII hour, hour_b1, hour_b0
-;        BcdTOASCII minute , minute_b1, minute_b0
-;        sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
