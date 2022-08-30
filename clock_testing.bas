@@ -40,7 +40,8 @@ Initialize:
 HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte ' Initialize clock
 hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time
 hi2cout $08,($2, control, day, $28) ' Set Alarm
-
+hintsetup %00000010
+setint %00000010, %00000010, C
 
 main_menu:
     serTXD (CR, "--- Main Menu ---", CR)
@@ -71,13 +72,10 @@ main_menu:
     goto main_menu
 
 alarm_monitor:
-    do while control >= 1
-        if pinC.2 = 1 then
-            serTXD ("Pin high!")
-    endif
-    loop
+    serTXD ("Sleeping", CR, LF)
+    sleep 0
+    serTXD ("Waking", CR, LF)
     return
-        
 
 rtc_to_ascii:
 ' Read RTC data from DS3231
@@ -160,6 +158,10 @@ display_time:
     gosub rtc_to_ascii
     sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
   return
+
+interrupt:
+    serTXD ("Interrupted", CR, LF)
+    return
 
 ;    PAUSE 1000
 ;    ReadRegisters:
