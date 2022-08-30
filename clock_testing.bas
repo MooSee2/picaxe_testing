@@ -26,18 +26,21 @@ SYMBOL minute_b1 = b19
 
 ' Set default time info, but don't in main program, clock should be set and left until battery reset or manual change
 let minute = $0
-let hour = $12
+let hour = $12 ' Set hour
+setbit hour, 6 ' Set bit 6 in hour to 1 to set 24hr mode in RTC
 let day = $1
 let date = $28
 let month = $8
 let year = $22
-let control = %00010000
+let control = $12
+setbit control, 7 ' Set bit 7 of alarm hour to 1 to enable once per 24 hour sampling.
 
 Initialize:
 ' Only initialize clock on startup, don't set time or alarm.
 HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte ' Initialize clock
-hi2cout 0,($0 , minute, hour, day, date, month, year, control) ' Set Time
-hi2cout 8,($15, $15, day, $3, control) ' Set Alarm
+hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time
+hi2cout $08,($2, control, day, $28) ' Set Alarm
+
 
 main_menu:
     serTXD (CR, "--- Main Menu ---", CR)
@@ -47,6 +50,7 @@ main_menu:
         "1       | Return value at b0", CR, _
         "2       | Set Clock/Alarm", CR, _
         "4       | Display Time", CR, _
+        "5       | alarm_monitor", CR, _
         "254     | Reset picaxe", CR, CR)
     serTXD ("Enter q<command>:  ")
     serRXD b0
@@ -57,6 +61,8 @@ main_menu:
         gosub set_clock ' Set Time/Alarm
     elseif b0 = 4 then
         gosub display_time ' Display Time/Alarm
+    elseif b0 = 5 then
+        gosub alarm_monitor ' Display Time/Alarm
     elseif b0 = 254 then
         reset
     else 
@@ -64,11 +70,22 @@ main_menu:
     endif
     goto main_menu
 
+alarm_monitor:
+    do while control >= 1
+        if pinC.2 = 1 then
+            serTXD ("Pin high!")
+    endif
+    loop
+    return
+        
+
 rtc_to_ascii:
 ' Read RTC data from DS3231
     BcdTOASCII year , year_b1, year_b0
     BcdTOASCII month, month_b1, month_b0
     BcdTOASCII date , date_b1, date_b0
+    clearbit hour, 6 ' Set bit 6 in hour to 0 to to read correctly from RTC
+    clearbit hour, 7 ' Set bit 6 in hour to 0 to to read correctly from RTC
     BcdTOASCII hour, hour_b1, hour_b0
     BcdTOASCII minute , minute_b1, minute_b0
     return
@@ -80,11 +97,11 @@ set_clock:
     if b0 = 1 then
         serTXD ("Programming Time", CR, LF)
         gosub enter_clock_time
-        hi2cout 0,($0, minute, hour, day, date, month, year, control) ' Set Time
+        hi2cout 0,($0, minute, hour, day, date, month, year) ' Set Time
     elseif b0 = 2 then
         serTXD ("Programming Alarm", CR, LF)
         gosub enter_clock_time
-        hi2cout 7,($0, minute, hour, day, date, month, year, control) ' Set Alarm
+        hi2cout 7,($0, minute, hour, day, date, month, year) ' Set Alarm
     else
         serTXD ("Invalid entry", CR, LF)
         return
@@ -111,6 +128,7 @@ enter_clock_time:
     if b0 = 0 then
         gosub enter_clock_time
     elseif b0 = 1 then
+        setbit hour, 6 ' Set bit 6 in hour to 1 to set 24hr mode in RTC
         hour = bintobcd hour
         minute = bintobcd minute
         year = bintobcd year
