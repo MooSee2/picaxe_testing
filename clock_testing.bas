@@ -38,8 +38,8 @@ Symbol CTR_CONV  = bit5
 Symbol CTR_BBSQW = bit6
 Symbol CTR_EOSC  = bit7
 Symbol STS       = $0F ; Status Register
-Symbol STS_A1IF  = bit0
-Symbol STS_A2IF  = bit1
+Symbol STS_A1F  = bit0
+Symbol STS_A2F  = bit1
 Symbol STS_BSY   = bit2
 Symbol STS_EN32K = bit3
 Symbol STS_OSF   = bit7
@@ -56,43 +56,55 @@ let control = $12
 
 Initialize:
 ' Only initialize clock on startup, don't set time or alarm.
-'HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte ' Initialize clock
-'hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time, seconds default to 00.
+HI2cSetup I2CMASTER, DS3231, I2CSLOW, I2CBYTE ' Initialize clock
+hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time, seconds default to 00.
 'hi2cout $0A, (%00000000) ' Set DY/DT to 0 for date.  1 = day
 'hi2cout $07,($0, $1, $12, %10101000) ' Set Alarm SS, MM, HH, A1M4 register to 1: Alarm when hours, minutes, and seconds match
-'hi2cout $0E, (%00000101, %00000000) ' Set alarm 1 active, interrupts active, and clear control/status
+;hi2cout $0E, (%00001110) ' Set alarm 2 active, interrupts active
 
 #Macro set_alarm2(x,d,h,m)
-    ; Disable Alarm 2
-    HI2cIn  CTR, (b0)
+    ; Disable Alarm 1 and 2
+    HI2cIn  CTR, (b22)
+    CTR_A1IE  = 0
     CTR_A2IE  = 0
-    HI2cOut CTR, (b0)
-    ; Clear Alarm 2 Flags
-    HI2cIn  STS, (b0)
-    STS_A2IF  = 0
-    HI2cOut STS, (b0)
+    HI2cOut CTR, (b22)
+    ; Clear Alarm 1 and 2 Flags
+    HI2cIn  STS, (b22)
+    STS_A1F  = 0
+    STS_A2F  = 0
+    HI2cOut STS, (b22)
+    HI2cOut STS, (%00001000)
     ; Set Alarm 2
-    b0 = x
-    b1 = m / 10 * 6 + m : b1 = bit0 * $80 | b1
-    b2 = h / 10 * 6 + h : b2 = bit1 * $80 | b2
-    b3 = d / 10 * 6 + d : b3 = bit2 * $80 | b3 : b3 = bit3 * $40 | b3
-    HI2cOut DAT_A2, (b1,b2,b3)
-    ; Enable Alarm 2
-    HI2cIn  CTR, (b0)
-    CTR_A2IE  = 1
-    CTR_INTCN = 1
-    HI2cOut CTR, (b0)
+    
+    ;:  Need a2M4 a2M3 and A2M2 to be (0)-1-0-0, which are bit7 of register 0B 0C 0D, which is MM, HH, DD so need bit7 of those to be 1 (MM) - 0 (HH) - 0 (DD) otherwise it's gibberish
+    b22 = x ' 0100
+    ;b23 = m / 10 * 6 + m : b23 = bit0 * $80 | b23
+;    b24 = h / 10 * 6 + h : b24 = bit1 * $80 | b24
+;    b25 = d / 10 * 6 + d : b25 = bit2 * $80 | b25 : b25 = bit3 * $40 | b25
+    'b23 = %10000001
+    'setbit b23, 7
+    b23 = m
+    b24 = h
+    b25 = %10000000
+    
+    HI2cOut DAT_A2, (b23, b24, b25)
+    ; Enable Alarm 2 at 1HZ
+    'HI2cIn  CTR, (b22)
+    ;CTR_A2IE  = 1
+    ;CTR_INTCN = 1
+    ;CTR_RS1 = 0
+    ;CTR_RS2 = 0
+    HI2cOut CTR, (%00000110)
 #EndMacro
 
 ;#Define A2_EVERY_M()     A2(%1111,0,0,0) ; per minute
 ;#Define A2_M(m)          A2(%1110,0,0,m) ; minutes match
-#Define A2_HM(h,m)       set_alarm2(%1100,0,h,m) ; hours and minutes match
+#Define A2_HM(h, m)       set_alarm2(%1100, 0, h, m) ; hours and minutes match
 ;#Define A2_DAY_HM(d,h,m) A2(%0000,d,h,m) ; day, hours and minutes match
 ;#Define A2_DOW_HM(w,h,m) A2(%1000,w,h,m) ; day of week, hours and minutes match
 
-HI2cSetup I2CMASTER, DS3231, I2CSLOW, I2CBYTE
-A2_HM(12, 02) ; Alarm 2 at 12:02
 
+A2_HM($12, %00000001) ; Alarm 2 at 12:01
 hintsetup   %00000100
 setintflags %00000100,%00000100
 
@@ -119,7 +131,7 @@ main_menu:
     elseif b0 = 5 then
         gosub alarm_monitor ' Display Time/Alarm
     elseif b0 = 6 then
-        'gosub read_alarm_bus
+        gosub read_alarm_bus
     elseif b0 = 254 then
         reset
     else 
@@ -133,22 +145,30 @@ alarm_monitor:
     serTXD ("Waking", CR, LF)
     return
 
-;read_alarm_bus:
-;    hi2cin $0E, (b21, b22)
-;    b21 = bintobcd b21
-;    b22 = bintobcd b22
-;    'b24 = b21 / 16 * $FA + b21
-;    'b25 = b22 / 16 * $FA + b22
-;    sertxd( b24, ":", b25, cr, lf )
-;    return
+read_alarm_bus:
+    hi2cin CTR, (b0)
+    sertxd("CTR: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+    
+    hi2cin STS, (b0)
+    sertxd("STS: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+
+    hi2cin $0B, (b0)
+    sertxd("MM: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+
+    hi2cin $0C, (b0)
+    sertxd("HH: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+
+    hi2cin $0D, (b0)
+    sertxd("DD: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+
+    return
 
 rtc_to_ascii:
 ' Read RTC data from DS3231
     BcdTOASCII year , year_b1, year_b0
     BcdTOASCII month, month_b1, month_b0
-    'clearbit date, 7 ' Set bit 6 in hour to 0 to to read correctly from RTC
+    clearbit date, 7
     BcdTOASCII date , date_b1, date_b0
-    'clearbit hour, 6 ' Set bit 6 in hour to 0 to to read correctly from RTC
     BcdTOASCII hour, hour_b1, hour_b0
     BcdTOASCII minute , minute_b1, minute_b0
     return
@@ -212,7 +232,7 @@ display_time:
     ptr = 0
     if b0 = 2 then
         serTXD ("Current alarm is: ")
-        HI2Cin  8, (minute, hour, date)
+        HI2Cin  DAT_A2, (minute, hour, date)
     elseif b0 = 1 then
         serTXD ("Current time is: ")
         HI2Cin  1, (minute, hour, @ptr, date, month, year)
@@ -228,7 +248,7 @@ interrupt:
     serTXD ("Interrupted", CR, LF)
     flag2 = 0
     setintflags %00000100,%00000100
-    HI2CIN  $0F, (DataIn) ; Fetch the Control/Status register at location $0F
-    datain = DataIn AND %11111100 ; clear the two alarm bits bit1 and bit0 
-    HI2COUT $0F, (DataIn) ;Write back to clear interrupt flag
+    'HI2CIN  $0F, (DataIn) ; Fetch the Control/Status register at location $0F
+    'datain = DataIn AND %11111100 ; clear the two alarm bits bit1 and bit0 
+    'HI2COUT $0F, (DataIn) ;Write back to clear interrupt flag
     return

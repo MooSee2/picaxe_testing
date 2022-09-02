@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-16"?>
 <DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <FindHistory>
+    <string>b23</string>
+    <string>b22</string>
+    <string>b4</string>
+    <string>hour</string>
+    <string>minute</string>
     <string>date</string>
     <string>clearbit</string>
     <string>setbit</string>
     <string>alarm_monitor</string>
     <string>read_rtc</string>
-    <string>get_rtc_time</string>
-    <string>setup_clock</string>
-    <string>D5</string>
-    <string>D4</string>
-    <string>D3</string>
   </FindHistory>
   <ReplaceHistory>
     <string>rtc_to_ascii</string>
@@ -27,7 +27,7 @@
   <BreakPoints />
   <SelectedLine>0</SelectedLine>
   <SelectedColumn>0</SelectedColumn>
-  <CaretOffset>2820</CaretOffset>
+  <CaretOffset>138</CaretOffset>
   <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
   <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
   <HorizontalSplitterPosition>0</HorizontalSplitterPosition>
