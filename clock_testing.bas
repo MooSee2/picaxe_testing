@@ -26,10 +26,27 @@ SYMBOL minute_b0 = b18
 SYMBOL minute_b1 = b19
 symbol datain = b20
 
+Symbol DS3231    = $D0 ; DS3231 I2C Device
+Symbol DAT_A2    = $0B ; Alarm 2 Registers
+Symbol CTR       = $0E ; Control Register
+Symbol CTR_A1IE  = bit0
+Symbol CTR_A2IE  = bit1
+Symbol CTR_INTCN = bit2
+Symbol CTR_RS1   = bit3
+Symbol CTR_RS2   = bit4
+Symbol CTR_CONV  = bit5
+Symbol CTR_BBSQW = bit6
+Symbol CTR_EOSC  = bit7
+Symbol STS       = $0F ; Status Register
+Symbol STS_A1IF  = bit0
+Symbol STS_A2IF  = bit1
+Symbol STS_BSY   = bit2
+Symbol STS_EN32K = bit3
+Symbol STS_OSF   = bit7
+
 ' Set default time info, but don't in main program, clock should be set and left until battery reset or manual change
 let minute = $0
-let hour = $12 ' Set hour
-'setbit hour, 6 ' Set bit 6 in hour to 1 to set 24hr mode in RTC
+let hour = $12
 let day = $1
 let date = $28
 let month = $8
@@ -39,17 +56,45 @@ let control = $12
 
 Initialize:
 ' Only initialize clock on startup, don't set time or alarm.
-HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte ' Initialize clock
-hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time, seconds default to 00.
-hi2cout $0A, (%00000000) ' Set DY/DT to 0 for date.  1 = day
-hi2cout $07,($0, $1, $12, %10101000) ' Set Alarm SS, MM, HH, A1M4 register to 1: Alarm when hours, minutes, and seconds match
-hi2cout $0E, (%00000101, %00000000) ' Set alarm 1 active, interrupts active, and clear control/status
+'HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte ' Initialize clock
+'hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time, seconds default to 00.
+'hi2cout $0A, (%00000000) ' Set DY/DT to 0 for date.  1 = day
+'hi2cout $07,($0, $1, $12, %10101000) ' Set Alarm SS, MM, HH, A1M4 register to 1: Alarm when hours, minutes, and seconds match
+'hi2cout $0E, (%00000101, %00000000) ' Set alarm 1 active, interrupts active, and clear control/status
 
+#Macro set_alarm2(x,d,h,m)
+    ; Disable Alarm 2
+    HI2cIn  CTR, (b0)
+    CTR_A2IE  = 0
+    HI2cOut CTR, (b0)
+    ; Clear Alarm 2 Flags
+    HI2cIn  STS, (b0)
+    STS_A2IF  = 0
+    HI2cOut STS, (b0)
+    ; Set Alarm 2
+    b0 = x
+    b1 = m / 10 * 6 + m : b1 = bit0 * $80 | b1
+    b2 = h / 10 * 6 + h : b2 = bit1 * $80 | b2
+    b3 = d / 10 * 6 + d : b3 = bit2 * $80 | b3 : b3 = bit3 * $40 | b3
+    HI2cOut DAT_A2, (b1,b2,b3)
+    ; Enable Alarm 2
+    HI2cIn  CTR, (b0)
+    CTR_A2IE  = 1
+    CTR_INTCN = 1
+    HI2cOut CTR, (b0)
+#EndMacro
+
+;#Define A2_EVERY_M()     A2(%1111,0,0,0) ; per minute
+;#Define A2_M(m)          A2(%1110,0,0,m) ; minutes match
+#Define A2_HM(h,m)       set_alarm2(%1100,0,h,m) ; hours and minutes match
+;#Define A2_DAY_HM(d,h,m) A2(%0000,d,h,m) ; day, hours and minutes match
+;#Define A2_DOW_HM(w,h,m) A2(%1000,w,h,m) ; day of week, hours and minutes match
+
+HI2cSetup I2CMASTER, DS3231, I2CSLOW, I2CBYTE
+A2_HM(12, 02) ; Alarm 2 at 12:02
 
 hintsetup   %00000100
 setintflags %00000100,%00000100
-
-'SETINT %10000000, %10000000, C ' Set interrupt on Pin C.7 high
 
 main_menu:
     serTXD (CR, "--- Main Menu ---", CR)
@@ -74,7 +119,7 @@ main_menu:
     elseif b0 = 5 then
         gosub alarm_monitor ' Display Time/Alarm
     elseif b0 = 6 then
-        gosub read_alarm_bus
+        'gosub read_alarm_bus
     elseif b0 = 254 then
         reset
     else 
@@ -88,20 +133,20 @@ alarm_monitor:
     serTXD ("Waking", CR, LF)
     return
 
-read_alarm_bus:
-    hi2cin $0E, (b21, b22)
-    b21 = bintobcd b21
-    b22 = bintobcd b22
-    'b24 = b21 / 16 * $FA + b21
-    'b25 = b22 / 16 * $FA + b22
-    sertxd( b24, ":", b25, cr, lf )
-    return
+;read_alarm_bus:
+;    hi2cin $0E, (b21, b22)
+;    b21 = bintobcd b21
+;    b22 = bintobcd b22
+;    'b24 = b21 / 16 * $FA + b21
+;    'b25 = b22 / 16 * $FA + b22
+;    sertxd( b24, ":", b25, cr, lf )
+;    return
 
 rtc_to_ascii:
 ' Read RTC data from DS3231
     BcdTOASCII year , year_b1, year_b0
     BcdTOASCII month, month_b1, month_b0
-    clearbit date, 7 ' Set bit 6 in hour to 0 to to read correctly from RTC
+    'clearbit date, 7 ' Set bit 6 in hour to 0 to to read correctly from RTC
     BcdTOASCII date , date_b1, date_b0
     'clearbit hour, 6 ' Set bit 6 in hour to 0 to to read correctly from RTC
     BcdTOASCII hour, hour_b1, hour_b0
