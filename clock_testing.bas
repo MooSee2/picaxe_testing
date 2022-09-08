@@ -4,6 +4,7 @@
 #no_table
 #slot 0
 setfreq m8
+disablebod
 
 SYMBOL minute = b3
 SYMBOL hour = b4
@@ -62,30 +63,16 @@ hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time, seconds defa
 'hi2cout $07,($0, $1, $12, %10101000) ' Set Alarm SS, MM, HH, A1M4 register to 1: Alarm when hours, minutes, and seconds match
 ;hi2cout $0E, (%00001110) ' Set alarm 2 active, interrupts active
 
-#Macro set_alarm2(x,d,h,m)
-    ; Disable Alarm 1 and 2
-    HI2cIn  CTR, (b22)
-    CTR_A1IE  = 0
-    CTR_A2IE  = 0
-    HI2cOut CTR, (b22)
+#Macro set_alarm2(h,m)
     ; Clear Alarm 1 and 2 Flags
-    HI2cIn  STS, (b22)
-    STS_A1F  = 0
-    STS_A2F  = 0
-    HI2cOut STS, (b22)
     HI2cOut STS, (%00001000)
+    HI2cOut CTR, (%00000110) ' Enable INTCN and Alarm2
     ; Set Alarm 2
-    
-    ;:  Need a2M4 a2M3 and A2M2 to be (0)-1-0-0, which are bit7 of register 0B 0C 0D, which is MM, HH, DD so need bit7 of those to be 1 (MM) - 0 (HH) - 0 (DD) otherwise it's gibberish
-    b22 = x ' 0100
-    ;b23 = m / 10 * 6 + m : b23 = bit0 * $80 | b23
-;    b24 = h / 10 * 6 + h : b24 = bit1 * $80 | b24
-;    b25 = d / 10 * 6 + d : b25 = bit2 * $80 | b25 : b25 = bit3 * $40 | b25
-    'b23 = %10000001
-    'setbit b23, 7
-    b23 = m
-    b24 = h
-    b25 = %10000000
+    ;:  Need a2M4 a2M3 and A2M2 to be (0)-0-0-1, which are bit7 of register 0B 0C 0D, which is MM, HH, DD so need bit7 of those to be 0 (MM) - 0 (HH) - 1 (DD) otherwise it's gibberish
+
+    b23 = m         ' bit7 = 0
+    b24 = h         ' bit7 = 0
+    b25 = %10000000 ' bit7 = 1
     
     HI2cOut DAT_A2, (b23, b24, b25)
     ; Enable Alarm 2 at 1HZ
@@ -94,19 +81,19 @@ hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time, seconds defa
     ;CTR_INTCN = 1
     ;CTR_RS1 = 0
     ;CTR_RS2 = 0
-    HI2cOut CTR, (%00000110)
+    
 #EndMacro
 
 ;#Define A2_EVERY_M()     A2(%1111,0,0,0) ; per minute
 ;#Define A2_M(m)          A2(%1110,0,0,m) ; minutes match
-#Define A2_HM(h, m)       set_alarm2(%1100, 0, h, m) ; hours and minutes match
+#Define A2_HM(h, m)       set_alarm2(h, m) ; hours and minutes match
 ;#Define A2_DAY_HM(d,h,m) A2(%0000,d,h,m) ; day, hours and minutes match
 ;#Define A2_DOW_HM(w,h,m) A2(%1000,w,h,m) ; day of week, hours and minutes match
+low B.2
 
-
-A2_HM($12, %00000001) ; Alarm 2 at 12:01
-hintsetup   %00000100
-setintflags %00000100,%00000100
+A2_HM($12, $1) ; Alarm 2 at 12:01
+hintsetup   %00000100 ' Int on all 3 pins, INT0, INT1, INT2 = B.0, B.1, B.2
+setintflags %00000100,%00000100 ' Int on any pin 0,1,2
 
 main_menu:
     serTXD (CR, "--- Main Menu ---", CR)
@@ -141,6 +128,7 @@ main_menu:
 
 alarm_monitor:
     serTXD ("Sleeping", CR, LF)
+    HI2cOut STS, (%00001000)
     sleep 0
     serTXD ("Waking", CR, LF)
     return
@@ -160,7 +148,7 @@ read_alarm_bus:
 
     hi2cin $0D, (b0)
     sertxd("DD: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
-
+    
     return
 
 rtc_to_ascii:
@@ -246,6 +234,8 @@ display_time:
 
 interrupt:
     serTXD ("Interrupted", CR, LF)
+    flag0 = 0
+    flag1 = 0
     flag2 = 0
     setintflags %00000100,%00000100
     'HI2CIN  $0F, (DataIn) ; Fetch the Control/Status register at location $0F
