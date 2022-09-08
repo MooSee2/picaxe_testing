@@ -4,20 +4,26 @@ setfreq m8
 
 ' Outlet valve open/close positions:  150/250
 ' Always use sperate 6v for servos as they generate a lot of electrical noise.
-' serRXD = Serial recieve, Get user input
-' serTXD = Serial transmit, print to terminal
 
 
 ' Pin assignments
+' B.0 used for monitoring RTC alarm via interrupts
 symbol servo_IO = B.1
 symbol outlet_IO = B.2
+symbol subsamp = 2 ' Number of subsamples to take.
 
-symbol clock_reg = $00 ' Clock register
-symbol alarm2_reg = $0B ' Alarm2 register
-symbol CTR = $0E ' DS3231 Control register
-symbol STS = $0F ' DS3231 Status register
+' DS3231 registers
+symbol clock_reg = $00 ' Clock register start SS -> MM -> HH -> DAY (Sunday=1) -> Date -> MoMo -> YY
+symbol alarm2_reg = $0B ' Alarm2 register start MM -> HH
+symbol CTR = $0E ' Control register start
+symbol STS = $0F ' Status register start
 
 ' Variable assinmends
+' b0, b1, are reserved for w0
+symbol pulse_time_OFF = w0
+symbol enter = b2 ' User inputs for navigating menus
+
+' Time variables
 symbol minute = b3
 symbol hour = b4
 symbol day = b5
@@ -37,29 +43,30 @@ symbol hour_b1 = b18
 symbol hour_b0 = b19
 symbol minute_b0 = b20
 symbol minute_b1 = b21
+
+' Program variables
 symbol pump_runtime = b22
 symbol pulse_time = b23
 symbol sample_pulses = b24
 symbol slot_num = b25
 symbol servo_pos = b26
-symbol subsample_count = b27
-symbol finish = b28
-symbol current_slot = b29
-symbol sample_set = b30
-symbol temp = b47  ' temp var for calculations
-symbol i = b48  ' use in counter loops only
-symbol counter = b50
-symbol pulse_time_ON = b42
-symbol pulse_time_OFF = w0
+symbol subsample_count = b26
+symbol sample_set = b27
+symbol pulse_time_ON = b28
+
+' Temp variables
+symbol counter = b53
+symbol temp = b54  ' temp var for calculations
+symbol i = b55  ' use in counter loops only
 
 ' Initialize this every time picaxe is turned off/on, reset, or reprogrammed.
 init:
     servo outlet_IO, 250  ' Close outlet
     servo servo_IO, 255  ' Close main servo
-    let pump_runtime = 30  ' Default manifold flush time
+    let pump_runtime = 2  ' Default manifold flush time
     let pulse_time_ON = 100
     let pulse_time_OFF = 900
-    let sample_pulses = 30
+    let sample_pulses = 2
 
     'gosub init_clock
     HI2Csetup I2Cmaster, $D0, I2Cslow, I2Cbyte ' $D0 is DS3231 address on picaxe
@@ -67,8 +74,8 @@ init:
     hi2cout STS, (%00001000) ' Clear Status register
     hi2cout $0D, (%10000000) ' A2M4 bit 7 = 1, Alarm2 active when HH:MM == Clock HH:MM i.e. activate sampler once per day then sleep
     hintsetup   %00000000 ' Disable interrupts to allow user interface until sampling begins.
-    
-    
+
+
     ' REMOVE IN FINAL VERSION!  Only for testing purposes
     let minute = $1
     let hour = $20
@@ -89,29 +96,29 @@ main_menu:
     serTXD (_
         "Command | Action", CR, _
         "----------------", CR, _
-        "1       | Return value at b0", CR, _
-        "2       | Testing menu", CR, _
-        "3       | Set Time/Alarm", CR, _
-        "4       | Display Time/Alarm", CR, _
-        "5       | Begin Sampling", CR, _
-        "254     | Reset picaxe", CR, CR)
+        "1       | Testing menu", CR, _
+        "2       | Set Time/Alarm", CR, _
+        "3       | Display Time/Alarm", CR, _
+        "4       | Begin Sampling", CR, _
+        "254     | Reset picaxe", CR)
     serTXD ("Enter <command>:  ")
-    serRXD b0
-    serTXD (#b0, CR, CR, LF)
-    if b0 = 1 then
-        serTXD (#b0, CR, LF)
-    elseif b0 = 2 then
+    serRXD enter
+    serTXD (enter, CR, CR, LF)
+    if enter = 1 then
         goto testing_menu
-    elseif b0 = 3 then
+    elseif enter = 2 then
         gosub set_clock
-    elseif b0 = 4 then
+    elseif enter = 3 then
         gosub display_time
-    elseif b0 = 5 then
+    elseif enter = 4 then
         gosub begin_sampling
-    elseif b0 = 254 then
+    elseif enter = 254 then
         reset
+;        do
+;            hserin N9600, b2
+;        loop
     else 
-        serTXD (CR, "Invalid input:  ", #b0, CR, LF)
+        serTXD (CR, "Invalid input:  ", enter, CR, LF)
     endif
     goto main_menu
 
@@ -120,43 +127,25 @@ testing_menu:
         "--- Testing Menu ---", CR, CR, _
         "Command | Action", CR, _
         "----------------", CR, _
-        "2       | Manifold flush", CR, _
-        "7       | Wet filters", CR, _
-        "8       | Manual sample", CR, _
-        "3       | Move servo to slot", CR, _
-        "4       | Open outlet", CR, _
-        "5       | Close outlet", CR, _
-        "6       | Pulse pump", CR, _
-        "1       | Run pump", CR, _
+        "1       | Manifold flush", CR, _
+        "2       | Wet filters", CR, _
+        "3       | Manual sample", CR, _
+        "4       | Move servo to slot", CR, _
+        "5       | Open outlet", CR, _
+        "6       | Close outlet", CR, _
         "99      | Return to Main", CR, _
         "254     | Reset picaxe", CR, CR)
     serTXD ("Enter <command>:  ")
-    serRXD b0
-    serTXD (#b0, CR)
-    if b0 = 1 then  ' Run pump
-        gosub enter_pump_time
-        gosub run_pump
-    elseif b0 = 2 then  ' Manifold flush
+    serRXD enter
+    serTXD (enter, CR)
+    if enter = 1 then  ' Manifold flush
         gosub enter_pump_time
         gosub manifold_flush
-    elseif b0 = 3 then ' Move servo to slot
-        do
-            gosub enter_slot
-        loop
-    elseif b0 = 4 then  ' Open outlet
-        pause 300
-        gosub cpen_outlet
-    elseif b0 = 5 then  ' Close outlet
-        pause 300
-        gosub close_outlet
-    elseif b0 = 6 then  ' Pulse pump
-        gosub enter_pulses
-        gosub pulse_pump
-    elseif b0 = 7 then  ' Wet filters
+    elseif enter = 2 then  ' Wet filters
         serTXD ("Wet filters", CR)
         gosub enter_pulses
         gosub wet_filters
-    elseif b0 = 8 then  ' Manual sample
+    elseif enter = 3 then  ' Manual sample
         serTXD ("Manual sample", CR)
         gosub close_outlet
         gosub enter_slot
@@ -165,15 +154,34 @@ testing_menu:
         pause 300
         servopos servo_IO, 255
         pause 750
-    elseif b0 = 99 then  ' Return to main menu
+    elseif enter = 4 then ' Move servo to slot
+        do
+            gosub enter_slot
+        loop
+    elseif enter = 5 then  ' Open outlet
+        pause 300
+        gosub cpen_outlet
+    elseif enter = 6 then  ' Close outlet
+        pause 300
+        gosub close_outlet
+;    elseif enter = 7 then  ' Pulse pump
+;        gosub enter_pulses
+;        gosub pulse_pump
+;    elseif enter = 8 then  ' Pulse pump
+;        gosub enter_pump_time
+;        gosub run_pump
+    elseif enter = 99 then  ' Return to main menu
         goto main_menu
     else  ' Invalid input
-        serTXD (CR, "Invalid input:  ", #b0, CR, LF)
+        serTXD (CR, "Invalid input:  ", enter, CR, LF)
     endif
     goto testing_menu
 
 begin_sampling:
     ' Begin sampling program
+    let subsample_count = subsamp ' 1 subsample = 1 day
+    let sample_set = 1 ' 1-4 sets RA/FA
+
     serTXD (CR, "---Begin Sampling---", CR, LF)
     serTXD ("Enter start Hour ex: 09", CR)
     serRXD hour
@@ -185,19 +193,17 @@ begin_sampling:
     hour = bintobcd hour
     gosub init_clock
     hi2cout alarm2_reg, (minute, hour) ' Set Alarm
-    
+
     hintsetup   %00000001 ' Watch for interrupt on pin B.0
     setintflags %00000001,%00000001 ' Interrupt conditions: on pin B.0 going high?
     pause 500
 
-    let subsample_count = 7 ' days
-    let sample_set = 1 ' 1-4 sets RA/FA
-    'let finish = 0 ' Finish = 1 means sampling is complete and program sleeps.
-    
+    ' When the RTC alarm activates it interrupts the sleep and goes directly to the interrupt subroutine
+    ' After the interrupt routine completes, it returns to this loop and sleeps again until the alarm activates again and repeats
+    ' After final sample is taken, the program will sleep until reset by user to download data
     do
-        serTXD ("Sleeping", CR)
+        serTXD (CR, "Sleeping", CR)
         sleep 0
-        serTXD ("Waking", CR)
     loop
 
 init_clock:
@@ -219,12 +225,12 @@ rtc_to_ascii:
 set_clock:
     ' User set Time/Alarm
     serTXD ("Program: 1 = Time, 2 = Alarm", CR, LF)
-    serRXD b0
-    if b0 = 1 then
+    serRXD enter
+    if enter = 1 then
         serTXD ("Programming Time", CR, LF)
         gosub enter_clock_time
         hi2cout clock_reg,($0, minute, hour, day, date, month, year) ' Set Time
-    elseif b0 = 2 then
+    elseif enter = 2 then
         serTXD ("Programming Alarm", CR, LF)
         serTXD ("minute ex: 05", CR)
         serRXD minute
@@ -256,10 +262,10 @@ enter_clock_time:
     serRXD day
     serTXD ("Is this the correct time?: ", "20", #year, "/", #month, "/", #date, " ", #hour, ":", #minute, "  day = ", #day, CR)
     serTXD ("1 = yes 0 = no")
-    serRXD b0
-    if b0 = 0 then
+    serRXD enter
+    if enter = 0 then
         gosub enter_clock_time
-    elseif b0 = 1 then
+    elseif enter = 1 then
         hour = bintobcd hour
         minute = bintobcd minute
         year = bintobcd year
@@ -371,7 +377,7 @@ return
 
 cpen_outlet:
     ' Move outlet servo to open positoion
-    serTXD (CR, "Opening outlet", CR)
+    serTXD ("Opening outlet", CR)
     servopos Outlet_IO, 150
     'servopos Outlet_IO,OFF   ' PWM for pump messed up if servopos not turned off, no idea why
     pause 500
@@ -380,7 +386,7 @@ return
 close_outlet:
     ' Move outlet servo to open positoion
     ' Closed is default position set in init.
-    serTXD (CR, "Closing outlet", CR)
+    serTXD ("Closing outlet", CR)
     servopos Outlet_IO, 250
     pause 500
     ' servopos Outlet_IO,OFF  ' PWM for pump messed up if servopos not turned off, no idea why
@@ -408,15 +414,16 @@ return
 
 collect_sample:
     ' Collect sample logic.  Responsible for collecting 1 sample.
-    gosub cpen_outlet ' Open outlet valve
-    gosub run_pump ' Run pump to flush manifold
-    gosub close_outlet ' Close outlet valve
+    'gosub cpen_outlet ' Open outlet valve
+    'gosub run_pump ' Run pump to flush manifold
+    'gosub close_outlet ' Close outlet valve
     gosub move_servo ' Move servo to slot_num location
     gosub pulse_pump ' Pulse pump the number in sample_pulses times to collect subsample
     return
 
 collect_subsample:
     ' Collect subsample logic.  Should activate once per day, and collect subsamples in RA and FA vials.
+    gosub manifold_flush
     gosub collect_sample ' Collect RA
     inc slot_num
     gosub collect_sample ' Colelct FA
@@ -433,45 +440,47 @@ load_data:
 
 interrupt:
     ' When RTC alarm activates, run sample collection logic
+    serTXD ("Waking", CR)
+    if subsample_count <= 0 then ' If all subsamples have been taken, move to next sample set
+        inc sample_set ' Increment sample set by 1
+        subsample_count = subsamp ' Reset subsamples
+    endif
     if sample_set = 1 then ' First sample set
-        if subsample_count > 0 then ' subsample for 7 days.  If subsample available, continue with sampling current sample set
-            slot_num = 1
-            gosub collect_subsample ' Collect RA and FA
-        elseif subsample_count <= 0 then ' If all subsamples have been taken, move to next sample set
-            inc sample_set ' Increment sample set by 1
-            subsample_count = 7 ' Reset subsamples
-        endif
+        slot_num = 1
+        gosub collect_subsample ' Collect RA and FA
+        serTXD ("Sample set: ", #sample_set, CR)
+        serTXD ("Subsamples left: ", #subsample_count, CR)
     elseif sample_set = 2 then
-        if subsample_count > 0 then
-            slot_num = 3
-            gosub collect_subsample
-        elseif subsample_count <= 0 then
-            inc sample_set
-            subsample_count = 7
-        endif
+        slot_num = 3
+        gosub collect_subsample
+        serTXD ("Sample set: ", #sample_set, CR)
+        serTXD ("Subsamples left: ", #subsample_count, CR)
     elseif sample_set = 3 then
         if subsample_count > 0 then
             slot_num = 5
             gosub collect_subsample
-        elseif subsample_count <= 0 then
-            inc sample_set
-            subsample_count = 7
+            serTXD ("Sample set: ", #sample_set, CR)
+            serTXD ("Subsamples left: ", #subsample_count, CR)
         endif
     elseif sample_set = 4 then
         slot_num = 7
         if subsample_count > 0 then
             gosub collect_subsample
+            serTXD ("Sample set: ", #sample_set, CR)
+            serTXD ("Subsamples left: ", #subsample_count, CR)
         elseif subsample_count <= 0 then
             setintflags %00000001,%00000000
             sleep 0
         endif
     else ' If sample set >= 5, then end sampling by sleeping, turn off interrupts
+        serTXD ("Sampling complete, entering sleep.", CR)
         setintflags %00000001,%00000000
-        sleep 0
+        return
     endif
 
     flag0 = 0 ' Clear flag 0
     setintflags %00000001,%00000001 ' Reset to interrupt on flag0
     hi2cout STS, (%00001000) ' Reset status register.  Resets alarm2 on RTC
-    pause 200
+    serTXD("Exiting interrupt", CR)
+    'pause 200
     return

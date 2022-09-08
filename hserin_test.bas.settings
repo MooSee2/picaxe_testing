@@ -1,18 +1,20 @@
 <?xml version="1.0" encoding="utf-16"?>
 <DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <FindHistory>
-    <string>subsample_count</string>
-    <string>HI2Csetup</string>
+    <string> b0</string>
+    <string>b0 =</string>
+    <string>#b0</string>
+    <string>pulse_time_ON</string>
+    <string />
     <string>counter</string>
-    <string>("q"), #</string>
-    <string>control</string>
-    <string>setup_clock</string>
-    <string>manual_slot_selection</string>
-    <string>enter_slot_num</string>
-    <string>Sample_pulses</string>
-    <string>b43</string>
+    <string>current_slot</string>
+    <string>b2</string>
+    <string>i </string>
+    <string>i</string>
   </FindHistory>
   <ReplaceHistory>
+    <string>enter =</string>
+    <string>enter</string>
     <string />
     <string>enter_slot</string>
     <string>enter_pulses</string>
@@ -21,14 +23,15 @@
     <string>serRXD ("q"), #b0</string>
     <string>baud_IO</string>
     <string>out_IO</string>
-    <string>N4800</string>
   </ReplaceHistory>
   <ReplaceSearchHistory />
   <Bookmarks />
-  <BreakPoints />
+  <BreakPoints>
+    <int>475</int>
+  </BreakPoints>
   <SelectedLine>0</SelectedLine>
   <SelectedColumn>0</SelectedColumn>
-  <CaretOffset>995</CaretOffset>
+  <CaretOffset>14688</CaretOffset>
   <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
   <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
   <HorizontalSplitterPosition>0</HorizontalSplitterPosition>
