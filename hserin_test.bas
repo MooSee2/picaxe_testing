@@ -9,8 +9,13 @@ setfreq m8
 
 
 ' Pin assignments
-symbol Outlet_IO = B.1
-symbol servo_IO = B.3
+symbol servo_IO = B.1
+symbol outlet_IO = B.2
+
+symbol clock_reg = $00 ' Clock register
+symbol alarm2_reg = $0B ' Alarm2 register
+symbol CTR = $0E ' DS3231 Control register
+symbol STS = $0F ' DS3231 Status register
 
 ' Variable assinmends
 symbol minute = b3
@@ -42,29 +47,37 @@ symbol finish = b28
 symbol current_slot = b29
 symbol sample_set = b30
 symbol temp = b47  ' temp var for calculations
-symbol i = b48  ' use in counter loops only.
+symbol i = b48  ' use in counter loops only
 symbol counter = b50
 symbol pulse_time_ON = b42
 symbol pulse_time_OFF = w0
 
+' Initialize this every time picaxe is turned off/on, reset, or reprogrammed.
 init:
-    servo Outlet_IO, 250  ' Close outlet
+    servo outlet_IO, 250  ' Close outlet
     servo servo_IO, 255  ' Close main servo
     let pump_runtime = 30  ' Default manifold flush time
     let pulse_time_ON = 100
     let pulse_time_OFF = 900
     let sample_pulses = 30
+
+    'gosub init_clock
+    HI2Csetup I2Cmaster, $D0, I2Cslow, I2Cbyte ' $D0 is DS3231 address on picaxe
+    hi2cout CTR, (%00000110) ' Enable INTCN and Alarm2
+    hi2cout STS, (%00001000) ' Clear Status register
+    hi2cout $0D, (%10000000) ' A2M4 bit 7 = 1, Alarm2 active when HH:MM == Clock HH:MM i.e. activate sampler once per day then sleep
+    hintsetup   %00000000 ' Disable interrupts to allow user interface until sampling begins.
+    
+    
+    ' REMOVE IN FINAL VERSION!  Only for testing purposes
     let minute = $1
     let hour = $20
     let day = $1
     let date = $2
     let month = $6
     let year = $22
-    let control = %00010000 ' For RTC
-    gosub init_clock
-    hi2cout 0,($0 , minute, hour, day, date, month, year, control) ' Set Time
-    hi2cout 8,($15, $15, day, $3, control) ' Set Alarm
-    pause 500
+    hi2cout clock_reg,($01 , minute, hour, day, date, month, year) ' Set Time
+    hi2cout $0B, (%10000000, %10000000, %10000000) ' Set the alarm to go off every minute regardless of alarm time
 
 clear_terminal:
     serTXD (CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR)
@@ -72,6 +85,7 @@ clear_terminal:
 
 main_menu:
     serTXD (CR, "--- Main Menu ---", CR)
+    gosub display_time
     serTXD (_
         "Command | Action", CR, _
         "----------------", CR, _
@@ -100,80 +114,6 @@ main_menu:
         serTXD (CR, "Invalid input:  ", #b0, CR, LF)
     endif
     goto main_menu
-
-begin_sampling:
-    serTXD (CR, "---Begin Sampling---", CR, LF)
-    serTXD ("Enter start Hour ex: 09", CR)
-    serRXD hour
-    serTXD ("Enter start Minute ex: 05", CR)
-    serRXD minute
-    minute = bintobcd minute
-    hour = bintobcd hour
-    gosub init_clock
-    hi2cout 7,($0, minute, hour, day, date, month, year, control) ' Set Alarm
-
-    let subsample_count = 7 ' days
-    let slot_num = 0 ' 0-8 slots
-    let sample_set = 1 ' 1-4 sets RA/FA
-    let finish = 0 ' Finish = 1 means sampling is complete and program sleeps.
-    Low C.2 ' Set C.2 off, i.e. Alarm not active, program should sleep
-    
-    Do while finish = 0
-        if pinC.2 = 0 then ' Alarm OFF, so sleep
-            sleep 0
-        elseif pinC.2 = 1 AND sample_set = 1 then
-            if subsample_count > 0 then
-                gosub collect_subsample
-            elseif subsample_count <= 0 then
-                sample_set = 2
-            endif            
-            low C.2
-        elseif pinC.2 = 1 AND sample_set = 2 then
-            if subsample_count > 0 then
-                gosub collect_subsample
-            elseif subsample_count <= 0 then
-                sample_set = 3
-            endif            
-            low C.2
-        elseif pinC.2 = 1 AND sample_set = 3 then
-            if subsample_count > 0 then
-                gosub collect_subsample
-            elseif subsample_count <= 0 then
-                sample_set = 4
-            endif            
-            low C.2
-        elseif pinC.2 = 1 AND sample_set = 4 then
-            if subsample_count > 0 then
-                gosub collect_subsample
-            elseif subsample_count <= 0 then
-                sample_set = 99
-            endif            
-            low C.2
-        else ' If sample set >= 5, then end sampling
-            sleep 0
-        endif
-    loop
-
-collect_sample:
-    gosub move_servo
-    gosub cpen_outlet
-    gosub run_pump
-    gosub close_outlet
-    gosub pulse_pump
-    return
-
-collect_subsample:
-    inc slot_num
-    gosub collect_sample
-    inc slot_num
-    gosub collect_sample
-    slot_num = 0
-    gosub move_servo
-    dec subsample_count
-
-init_clock:
-    HI2Csetup I2Cmaster, %11010000, I2Cslow, I2Cbyte
-    return
 
 testing_menu:
     serTXD (CR, _
@@ -232,10 +172,43 @@ testing_menu:
     endif
     goto testing_menu
 
-'  Clock subroutines
+begin_sampling:
+    ' Begin sampling program
+    serTXD (CR, "---Begin Sampling---", CR, LF)
+    serTXD ("Enter start Hour ex: 09", CR)
+    serRXD hour
+    serTXD ("Enter start Minute ex: 05", CR)
+    serRXD minute
+    serTXD ("Sampling will begin at: ", #hour, ":", #minute, CR)
+    gosub display_time
+    minute = bintobcd minute
+    hour = bintobcd hour
+    gosub init_clock
+    hi2cout alarm2_reg, (minute, hour) ' Set Alarm
+    
+    hintsetup   %00000001 ' Watch for interrupt on pin B.0
+    setintflags %00000001,%00000001 ' Interrupt conditions: on pin B.0 going high?
+    pause 500
+
+    let subsample_count = 7 ' days
+    let sample_set = 1 ' 1-4 sets RA/FA
+    'let finish = 0 ' Finish = 1 means sampling is complete and program sleeps.
+    
+    do
+        serTXD ("Sleeping", CR)
+        sleep 0
+        serTXD ("Waking", CR)
+    loop
+
+init_clock:
+    ' May not use this sub
+    hi2csetup i2cmaster, $D0, i2cslow, i2cbyte ' $D0 is DS3231 address on picaxe
+    hi2cout CTR, (%00000110) ' Enable INTCN and Alarm2
+    hi2cout STS, (%00001000) ' Clear Status register
+    return
 
 rtc_to_ascii:
-' Read RTC data from DS3231
+    ' Read RTC data from DS3231
     BcdTOASCII year , year_b1, year_b0
     BcdTOASCII month, month_b1, month_b0
     BcdTOASCII date , date_b1, date_b0
@@ -244,17 +217,23 @@ rtc_to_ascii:
     return
 
 set_clock:
-' Set Time/Alarm
+    ' User set Time/Alarm
     serTXD ("Program: 1 = Time, 2 = Alarm", CR, LF)
     serRXD b0
     if b0 = 1 then
         serTXD ("Programming Time", CR, LF)
         gosub enter_clock_time
-        hi2cout 0,($0, minute, hour, day, date, month, year, control) ' Set Time
+        hi2cout clock_reg,($0, minute, hour, day, date, month, year) ' Set Time
     elseif b0 = 2 then
         serTXD ("Programming Alarm", CR, LF)
-        gosub enter_clock_time
-        hi2cout 7,($0, minute, hour, day, date, month, year, control) ' Set Alarm
+        serTXD ("minute ex: 05", CR)
+        serRXD minute
+        serTXD ("hour ex: 09", CR)
+        serRXD hour
+        hour = bintobcd hour
+        minute = bintobcd minute
+        hi2cout alarm2_reg,(minute, hour) ' Set Alarm on RTC
+        serTXD ("Alarm2 set to: ", #hour, ":", #minute, CR)
     else
         serTXD ("Invalid entry", CR, LF)
         return
@@ -262,7 +241,7 @@ set_clock:
     return
 
 enter_clock_time:
-' Get input from user to enter Time/Alarm.
+    ' Get input from user to enter Time/Alarm.
     serTXD ("hour ex: 09", CR)
     serRXD hour
     serTXD ("minute ex: 05", CR)
@@ -295,37 +274,37 @@ enter_clock_time:
     endif
 
 display_time:
-' Display Time/Alarm to terminal
-    serTXD ("Display: 1 = Time 2 = Alarm", CR, LF)
-    serRXD b0
+    ' Display Time to terminal
     ptr = 0
-    if b0 = 2 then
-        serTXD ("Current alarm is: ")
-        HI2Cin  8, (minute, hour, @ptr, date)
-    elseif b0 = 1 then
-        serTXD ("Current time is: ")
-        HI2Cin  1, (minute, hour, @ptr, date, month, year)
-    else
-        serTXD ("Invalid entry", CR, LF)
-        return
-    endif
+    serTXD ("Current time is: ")
+    hi2Cin  1, (minute, hour, @ptr, date, month, year)
     gosub rtc_to_ascii
     sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
   return
 
+display_alarm2:
+    ' Display Alarm2 value to terminal
+    serTXD ("Current alarm is: ")
+    hi2Cin  alarm2_reg, (minute, hour)
+    gosub rtc_to_ascii
+    sertxd ("Current alarm set to: ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
+
 enter_pump_time:
+    ' Get user input for pump runtime
     serTXD ("Enter q<pump time>:  ", CR)
     serrxd pump_runtime
     serTXD ("Pumping ", #pump_runtime, " seconds", CR)
     return
 
 enter_pulses:
+    ' Get user input for number of sample pulses
     serTXD ("Enter q<pulses>:  ")
     serrxd sample_pulses
     serTXD (#sample_pulses, CR)
     return
 
 enter_slot:
+    ' Get user input for where to move main servo to
     serTXD ("Move to slot q<0-8, 99=exit>:")
     serRXD slot_num
     serTXD (#slot_num, CR)
@@ -427,5 +406,72 @@ manifold_flush:
     gosub close_outlet
 return
 
+collect_sample:
+    ' Collect sample logic.  Responsible for collecting 1 sample.
+    gosub cpen_outlet ' Open outlet valve
+    gosub run_pump ' Run pump to flush manifold
+    gosub close_outlet ' Close outlet valve
+    gosub move_servo ' Move servo to slot_num location
+    gosub pulse_pump ' Pulse pump the number in sample_pulses times to collect subsample
+    return
 
-' DS3213 clock from https://picaxeforum.co.uk/threads/ds3231-code-examples.18694/
+collect_subsample:
+    ' Collect subsample logic.  Should activate once per day, and collect subsamples in RA and FA vials.
+    gosub collect_sample ' Collect RA
+    inc slot_num
+    gosub collect_sample ' Colelct FA
+    slot_num = 0
+    gosub move_servo ' Return servo to slot 0, closed position.
+    dec subsample_count ' Decrease subsample_count by 1
+    return
+
+save_data:
+    return
+
+load_data:
+    return
+
+interrupt:
+    ' When RTC alarm activates, run sample collection logic
+    if sample_set = 1 then ' First sample set
+        if subsample_count > 0 then ' subsample for 7 days.  If subsample available, continue with sampling current sample set
+            slot_num = 1
+            gosub collect_subsample ' Collect RA and FA
+        elseif subsample_count <= 0 then ' If all subsamples have been taken, move to next sample set
+            inc sample_set ' Increment sample set by 1
+            subsample_count = 7 ' Reset subsamples
+        endif
+    elseif sample_set = 2 then
+        if subsample_count > 0 then
+            slot_num = 3
+            gosub collect_subsample
+        elseif subsample_count <= 0 then
+            inc sample_set
+            subsample_count = 7
+        endif
+    elseif sample_set = 3 then
+        if subsample_count > 0 then
+            slot_num = 5
+            gosub collect_subsample
+        elseif subsample_count <= 0 then
+            inc sample_set
+            subsample_count = 7
+        endif
+    elseif sample_set = 4 then
+        slot_num = 7
+        if subsample_count > 0 then
+            gosub collect_subsample
+        elseif subsample_count <= 0 then
+            setintflags %00000001,%00000000
+            sleep 0
+        endif
+    else ' If sample set >= 5, then end sampling by sleeping, turn off interrupts
+        setintflags %00000001,%00000000
+        sleep 0
+    endif
+
+    flag0 = 0 ' Clear flag 0
+    setintflags %00000001,%00000001 ' Reset to interrupt on flag0
+    hi2cout STS, (%00001000) ' Reset status register.  Resets alarm2 on RTC
+    pause 200
+    return
