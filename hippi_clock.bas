@@ -37,10 +37,12 @@ Symbol STS_OSF   = bit7
     b2 = h / 10 * 6 + h : b2 = bit1 * $80 | b2
     b3 = d / 10 * 6 + d : b3 = bit2 * $80 | b3 : b3 = bit3 * $40 | b3
     HI2cOut DAT_A2, (b1,b2,b3)
-    ; Enable Alarm 2
+    ; Enable Alarm 2 @ 1HZ
     HI2cIn  CTR, (b0)
     CTR_A2IE  = 1
     CTR_INTCN = 1
+    CTR_RS1 = 0
+    CTR_RS2 = 0
     HI2cOut CTR, (b0)
 #EndMacro
 
@@ -53,6 +55,6 @@ Symbol STS_OSF   = bit7
 ; Example code
 
 HI2cSetup I2CMASTER, DS3231, I2CSLOW, I2CBYTE
-  
+
 A1_MS(10,30) ; Alarm 1 once an hour at xx:10:30
 A2_EVERY_M() ; Alarm 2 every minute
