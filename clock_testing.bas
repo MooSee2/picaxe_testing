@@ -92,8 +92,8 @@ hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time, seconds defa
 low B.2
 
 A2_HM($12, $1) ; Alarm 2 at 12:01
-hintsetup   %00000100 ' Int on all 3 pins, INT0, INT1, INT2 = B.0, B.1, B.2
-setintflags %00000100,%00000100 ' Int on any pin 0,1,2
+hintsetup   %00000001 ' Int on all 3 pins, INT0, INT1, INT2 = B.0, B.1, B.2
+setintflags %00000001,%00000001 ' Int on any pin 0,1,2
 
 main_menu:
     serTXD (CR, "--- Main Menu ---", CR)

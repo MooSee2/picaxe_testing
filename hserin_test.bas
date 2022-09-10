@@ -8,8 +8,8 @@ setfreq m8
 
 ' Pin assignments
 ' B.0 used for monitoring RTC alarm via interrupts
-symbol servo_IO = B.1
-symbol outlet_IO = B.2
+symbol servo_IO = B.2
+symbol outlet_IO = B.3
 symbol subsamp = 2 ' Number of subsamples to take.
 
 ' DS3231 registers
