@@ -213,24 +213,30 @@ enter_clock_time:
         return
     endif
 
-display_time:
-' Display Time/Alarm to terminal
-    serTXD ("Display: 1 = Time 2 = Alarm", CR, LF)
-    serRXD b0
-    ptr = 0
-    if b0 = 2 then
-        serTXD ("Current alarm is: ")
-        HI2Cin  DAT_A2, (minute, hour, date)
-    elseif b0 = 1 then
-        serTXD ("Current time is: ")
-        HI2Cin  1, (minute, hour, @ptr, date, month, year)
-    else
-        serTXD ("Invalid entry", CR, LF)
-        return
-    endif
-    gosub rtc_to_ascii
-    sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
-  return
+;display_time:
+;' Display Time/Alarm to terminal
+;    serTXD ("Display: 1 = Time 2 = Alarm", CR, LF)
+;    serRXD b0
+;    ptr = 0
+;    if b0 = 2 then
+;        serTXD ("Current alarm is: ")
+;        HI2Cin  DAT_A2, (minute, hour, date)
+;    elseif b0 = 1 then
+;        serTXD ("Current time is: ")
+;        HI2Cin  1, (minute, hour, @ptr, date, month, year)
+;    else
+;        serTXD ("Invalid entry", CR, LF)
+;        return
+;    endif
+;    gosub rtc_to_ascii
+;    sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
+;  return
+
+display_time: 
+    hi2cin DAT_A2, (minute, hour)
+    sertxd (#minute, ":", #hour)
+    
+    return
 
 interrupt:
     serTXD ("Interrupted", CR, LF)

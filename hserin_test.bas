@@ -43,16 +43,23 @@ symbol hour_b1 = b18
 symbol hour_b0 = b19
 symbol minute_b0 = b20
 symbol minute_b1 = b21
+symbol a2_hour = b22
+symbol a2_minute = b23
+symbol a2hour_b1 = b24
+symbol a2hour_b0 = b25
+symbol a2minute_b0 = b26
+symbol a2minute_b1 = b27
 
 ' Program variables
-symbol pump_runtime = b22
-symbol pulse_time = b23
-symbol sample_pulses = b24
-symbol slot_num = b25
-symbol servo_pos = b26
-symbol subsample_count = b28
-symbol sample_set = b29
-symbol pulse_time_ON = b30
+symbol pump_runtime = b28
+symbol pulse_time = b29
+symbol sample_pulses = b30
+symbol slot_num = b31
+symbol servo_pos = b32
+' b33 reserved for servo_pos overflow
+symbol subsample_count = b34
+symbol sample_set = b35
+symbol pulse_time_ON = b36
 
 ' Temp variables
 symbol counter = b53
@@ -84,7 +91,8 @@ init:
     let month = $6
     let year = $22
     hi2cout clock_reg,($01 , minute, hour, day, date, month, year) ' Set Time
-    hi2cout $0B, (%10000000, %10000000, %10000000) ' Set the alarm to go off every minute regardless of alarm time
+    hi2cout alarm2_reg, (%10000101, %10010011, %10000000) ' Set the alarm to go off every minute regardless of alarm time
+
 
 clear_terminal:
     serTXD (CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR)
@@ -98,8 +106,9 @@ main_menu:
         "----------------", CR, _
         "1       | Testing menu", CR, _
         "2       | Set Time/Alarm", CR, _
-        "3       | Display Time/Alarm", CR, _
-        "4       | Begin Sampling", CR, _
+        "3       | Display Time", CR, _
+        "4       | Display Alarm", CR, _
+        "9       | Begin Sampling", CR, _
         "254     | Reset picaxe", CR)
     serTXD ("Enter <command>:  ")
     serRXD enter
@@ -111,6 +120,8 @@ main_menu:
     elseif enter = 3 then
         gosub display_time
     elseif enter = 4 then
+        gosub display_alarm2
+    elseif enter = 9 then
         gosub begin_sampling
     elseif enter = 254 then
         reset
@@ -206,20 +217,34 @@ begin_sampling:
         sleep 0
     loop
 
-init_clock:
-    ' May not use this sub
-    hi2csetup i2cmaster, $D0, i2cslow, i2cbyte ' $D0 is DS3231 address on picaxe
-    hi2cout CTR, (%00000110) ' Enable INTCN and Alarm2
-    hi2cout STS, (%00001000) ' Clear Status register
-    return
-
-rtc_to_ascii:
-    ' Read RTC data from DS3231
+display_time:
+    ' Display Time to terminal
+    ptr = 0
+    serTXD ("Current time is: ")
+    hi2Cin  1, (minute, hour, @ptr, date, month, year)
     BcdTOASCII year , year_b1, year_b0
     BcdTOASCII month, month_b1, month_b0
     BcdTOASCII date , date_b1, date_b0
     BcdTOASCII hour, hour_b1, hour_b0
     BcdTOASCII minute , minute_b1, minute_b0
+    sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
+  return
+
+display_alarm2:
+    ' Display Alarm2 value to terminal
+    hi2Cin  alarm2_reg, (a2_minute, a2_hour)
+    clearbit a2_hour, 7
+    clearbit a2_minute, 7
+    BcdTOASCII a2_hour, a2hour_b1, a2hour_b0
+    BcdTOASCII a2_minute , a2minute_b1, a2minute_b0
+    sertxd ("Current alarm set to: ", a2hour_b1, a2hour_b0, ":", a2minute_b1, a2minute_b0, CR, LF)
+    return
+
+init_clock:
+    ' May not use this sub
+    hi2csetup i2cmaster, $D0, i2cslow, i2cbyte ' $D0 is DS3231 address on picaxe
+    hi2cout CTR, (%00000110) ' Enable INTCN and Alarm2
+    hi2cout STS, (%00001000) ' Clear Status register
     return
 
 set_clock:
@@ -278,22 +303,6 @@ enter_clock_time:
         serTXD ("Invalid entry", CR, LF)
         return
     endif
-
-display_time:
-    ' Display Time to terminal
-    ptr = 0
-    serTXD ("Current time is: ")
-    hi2Cin  1, (minute, hour, @ptr, date, month, year)
-    gosub rtc_to_ascii
-    sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
-  return
-
-display_alarm2:
-    ' Display Alarm2 value to terminal
-    serTXD ("Current alarm is: ")
-    hi2Cin  alarm2_reg, (minute, hour)
-    gosub rtc_to_ascii
-    sertxd ("Current alarm set to: ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
 
 enter_pump_time:
     ' Get user input for pump runtime
