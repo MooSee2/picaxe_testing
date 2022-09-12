@@ -50,9 +50,9 @@ symbol pulse_time = b23
 symbol sample_pulses = b24
 symbol slot_num = b25
 symbol servo_pos = b26
-symbol subsample_count = b26
-symbol sample_set = b27
-symbol pulse_time_ON = b28
+symbol subsample_count = b28
+symbol sample_set = b29
+symbol pulse_time_ON = b30
 
 ' Temp variables
 symbol counter = b53
@@ -429,7 +429,7 @@ collect_subsample:
     gosub collect_sample ' Colelct FA
     slot_num = 0
     gosub move_servo ' Return servo to slot 0, closed position.
-    dec subsample_count ' Decrease subsample_count by 1
+    
     return
 
 save_data:
@@ -448,17 +448,20 @@ interrupt:
     if sample_set = 1 then ' First sample set
         slot_num = 1
         gosub collect_subsample ' Collect RA and FA
+        dec subsample_count ' Decrease subsample_count by 1
         serTXD ("Sample set: ", #sample_set, CR)
         serTXD ("Subsamples left: ", #subsample_count, CR)
     elseif sample_set = 2 then
         slot_num = 3
         gosub collect_subsample
+        dec subsample_count ' Decrease subsample_count by 1
         serTXD ("Sample set: ", #sample_set, CR)
         serTXD ("Subsamples left: ", #subsample_count, CR)
     elseif sample_set = 3 then
         if subsample_count > 0 then
             slot_num = 5
             gosub collect_subsample
+            dec subsample_count ' Decrease subsample_count by 1
             serTXD ("Sample set: ", #sample_set, CR)
             serTXD ("Subsamples left: ", #subsample_count, CR)
         endif
@@ -466,6 +469,7 @@ interrupt:
         slot_num = 7
         if subsample_count > 0 then
             gosub collect_subsample
+            dec subsample_count ' Decrease subsample_count by 1
             serTXD ("Sample set: ", #sample_set, CR)
             serTXD ("Subsamples left: ", #subsample_count, CR)
         elseif subsample_count <= 0 then

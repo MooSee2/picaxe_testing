@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-16"?>
 <DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <FindHistory>
+    <string>subsample_count</string>
+    <string>b26</string>
+    <string>b.26</string>
     <string>servo_IO</string>
     <string> b0</string>
     <string>b0 =</string>
@@ -8,9 +11,6 @@
     <string>pulse_time_ON</string>
     <string />
     <string>counter</string>
-    <string>current_slot</string>
-    <string>b2</string>
-    <string>i </string>
   </FindHistory>
   <ReplaceHistory>
     <string>enter =</string>
@@ -27,11 +27,11 @@
   <ReplaceSearchHistory />
   <Bookmarks />
   <BreakPoints>
-    <int>475</int>
+    <int>479</int>
   </BreakPoints>
   <SelectedLine>0</SelectedLine>
   <SelectedColumn>0</SelectedColumn>
-  <CaretOffset>272</CaretOffset>
+  <CaretOffset>13183</CaretOffset>
   <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
   <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
   <HorizontalSplitterPosition>0</HorizontalSplitterPosition>
