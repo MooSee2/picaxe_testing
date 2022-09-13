@@ -24,12 +24,12 @@ symbol pulse_time_OFF = w0
 symbol enter = b2 ' User inputs for navigating menus
 
 ' Time variables
-symbol minute = b3
-symbol hour = b4
+symbol minute = b23
+symbol hour = b22
 symbol day = b5
-symbol date = b6
-symbol month = b7
-symbol year = b8
+symbol date = b37
+symbol month = b4
+symbol year = b3
 symbol control = b9
 symbol year_b1 = b10
 symbol year_b0 = b11
@@ -43,8 +43,8 @@ symbol hour_b1 = b18
 symbol hour_b0 = b19
 symbol minute_b0 = b20
 symbol minute_b1 = b21
-symbol a2_hour = b22
-symbol a2_minute = b23
+symbol a2_hour = b6
+symbol a2_minute = b7
 symbol a2hour_b1 = b24
 symbol a2hour_b0 = b25
 symbol a2minute_b0 = b26
@@ -108,6 +108,8 @@ main_menu:
         "2       | Set Time/Alarm", CR, _
         "3       | Display Time", CR, _
         "4       | Display Alarm", CR, _
+        "5       | Load data", CR, _
+        "6       | Save data", CR, _
         "9       | Begin Sampling", CR, _
         "254     | Reset picaxe", CR)
     serTXD ("Enter <command>:  ")
@@ -121,6 +123,10 @@ main_menu:
         gosub display_time
     elseif enter = 4 then
         gosub display_alarm2
+    elseif enter = 5 then
+        gosub load_data
+    elseif enter = 6 then
+        gosub save_data
     elseif enter = 9 then
         gosub begin_sampling
     elseif enter = 254 then
@@ -442,9 +448,32 @@ collect_subsample:
     return
 
 save_data:
+    bptr = 10         ; Points to b10
+    write 60, year
+;    serTXD (#@bptr)
+;    @bptr = @bptr+1
+    write 61, month
+;    serTXD (#@bptr)
+;    @bptr = @bptr+1
+    write 62, day
+;    serTXD (#@bptr)
+;    @bptr = @bptr+1
+    write 63, a2_hour
+;    serTXD (#@bptr)
+;    @bptr = @bptr+1
+    write 64, a2_minute
+;    serTXD (#@bptr)
+;    @bptr = @bptr+1
     return
 
 load_data:
+;    serTXD ("20", @ptr, @ptrinc, "/", @ptrinc, @ptrinc, "/", @ptrinc, @ptrinc, " ", @ptrinc, @ptrinc, ":", @ptrinc, @ptrinc, "," @ptrinc, @ptrinc, CR, LF)
+    ptr = 0
+    for b0 = 60 to 64
+        read b0, @ptrinc
+    next b0
+    ptr = 0
+    sertxd ("20", @ptrinc, "/", @ptrinc, "/", @ptrinc, " ", @ptrinc, ":", @ptrinc, CR, LF)
     return
 
 interrupt:
