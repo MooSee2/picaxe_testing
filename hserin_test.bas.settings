@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-16"?>
 <DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <FindHistory>
+    <string>mem_index2</string>
+    <string>mem_index1</string>
+    <string>counter</string>
+    <string>prog_var</string>
+    <string>temp</string>
+    <string>year</string>
+    <string>yea</string>
     <string>load_data</string>
     <string>rtc_to_ascii</string>
     <string>hi2cout</string>
-    <string>display_alarm2</string>
-    <string>display_alarm</string>
-    <string>subsample_count</string>
-    <string>b26</string>
-    <string>b.26</string>
-    <string>servo_IO</string>
-    <string> b0</string>
   </FindHistory>
   <ReplaceHistory>
     <string>enter =</string>
@@ -29,7 +29,7 @@
   <BreakPoints />
   <SelectedLine>0</SelectedLine>
   <SelectedColumn>0</SelectedColumn>
-  <CaretOffset>13426</CaretOffset>
+  <CaretOffset>4576</CaretOffset>
   <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
   <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
   <HorizontalSplitterPosition>0</HorizontalSplitterPosition>
