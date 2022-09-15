@@ -64,7 +64,6 @@ symbol a2minute_b1 = b48
 symbol a2minute_b0 = b49
 '==============================================
 
-
 ' Temp variables
 symbol write_count = b51 ' Number of times save_data has been called.
 symbol mem_index2 = b52 ' 10 spaces after first empty eeprom address, upper bound of save data
@@ -74,7 +73,7 @@ symbol i = b55  ' use in counter loops only
 
 ' Initialize this every time picaxe is turned off/on, reset, or reprogrammed.
 init:
-    gosub init_clock ' Establish RTC
+    'gosub init_clock ' Establish RTC
     servo outlet_IO, 250  ' Close outlet
     servo servo_IO, 255  ' Close main servo
     let pump_runtime = 1  ' Default manifold flush time
@@ -88,7 +87,6 @@ init:
     hi2cout $0D, (%10000000) ' A2M4 bit 7 = 1, Alarm2 active when HH:MM == Clock HH:MM i.e. activate sampler once per day then sleep
     hintsetup   %00000000 ' Disable interrupts to allow user interface until sampling begins.
 
-
     ' REMOVE IN FINAL VERSION!  Only for testing purposes
     let minute = $1
     let hour = $20
@@ -98,7 +96,6 @@ init:
     let year = $22
     hi2cout clock_reg,($01 , minute, hour, day, date, month, year) ' Set Time
     hi2cout alarm2_reg, (%10000101, %10010011, %10000000) ' Set the alarm to go off every minute regardless of alarm time
-
 
 clear_terminal:
     serTXD (CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR)
@@ -217,12 +214,12 @@ begin_sampling:
     serRXD a2_hour
     serTXD ("Enter start Minute ex: 05", CR)
     serRXD a2_minute
-    serTXD ("Sampling will begin at: ", #a2_hour, ":", #a2_minute, CR)
+    'serTXD ("Sampling will begin at: ", #a2_hour, ":", #a2_minute, CR)
     gosub display_time
 
     a2_minute = bintobcd a2_minute
     a2_hour = bintobcd a2_hour
-    hi2cout alarm2_reg, (a2_minute, a2_hour) ' Set Alarm
+    hi2cout alarm2_reg, (a2_minute, a2_hour, %10000000) ' Set Alarm
     hintsetup   %00000001 ' Setup watch for interrupt on pin B.0
     setintflags %00000001,%00000001 ' Interrupt conditions: Int on pin B.0 going high
     gosub display_alarm2
@@ -252,14 +249,14 @@ set_clock:
         hi2cout clock_reg,($0, minute, hour, day, date, month, year) ' Set Time
     elseif enter = 2 then
         serTXD ("Programming Alarm", CR, LF)
-        serTXD ("minute ex: 05", CR)
-        serRXD minute
         serTXD ("hour ex: 09", CR)
-        serRXD hour
-        hour = bintobcd hour
-        minute = bintobcd minute
-        hi2cout alarm2_reg,(minute, hour) ' Set Alarm on RTC
-        serTXD ("Alarm2 set to: ", #hour, ":", #minute, CR)
+        serRXD a2_hour
+        serTXD ("minute ex: 05", CR)
+        serRXD a2_minute
+        serTXD ("Alarm2 set to: ", #a2_hour, ":", #a2_minute, CR)
+        a2_hour = bintobcd a2_hour
+        a2_minute = bintobcd a2_minute
+        hi2cout alarm2_reg,(a2_minute, a2_hour) ' Set Alarm on RTC
     else
         serTXD ("Invalid entry", CR, LF)
         return

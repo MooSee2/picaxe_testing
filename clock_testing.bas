@@ -63,35 +63,21 @@ hi2cout $00,($0 , minute, hour, day, date, month, year) ' Set Time, seconds defa
 'hi2cout $07,($0, $1, $12, %10101000) ' Set Alarm SS, MM, HH, A1M4 register to 1: Alarm when hours, minutes, and seconds match
 ;hi2cout $0E, (%00001110) ' Set alarm 2 active, interrupts active
 
-#Macro set_alarm2(h,m)
-    ; Clear Alarm 1 and 2 Flags
-    HI2cOut STS, (%00001000)
-    HI2cOut CTR, (%00000110) ' Enable INTCN and Alarm2
-    ; Set Alarm 2
-    ;:  Need a2M4 a2M3 and A2M2 to be (0)-0-0-1, which are bit7 of register 0B 0C 0D, which is MM, HH, DD so need bit7 of those to be 0 (MM) - 0 (HH) - 1 (DD) otherwise it's gibberish
+; Clear Alarm 1 and 2 Flags
+HI2cOut CTR, (%00000110) ' Enable INTCN and Alarm2
+HI2cOut STS, (%00001000)
+; Set Alarm 2
+;:  Need a2M4 a2M3 and A2M2 to be (0)-0-0-1, which are bit7 of register 0B 0C 0D, which is MM, HH, DD so need bit7 of those to be 0 (MM) - 0 (HH) - 1 (DD) otherwise it's gibberish
 
-    b23 = m         ' bit7 = 0
-    b24 = h         ' bit7 = 0
-    b25 = %10000000 ' bit7 = 1
-    
-    HI2cOut DAT_A2, (b23, b24, b25)
-    ; Enable Alarm 2 at 1HZ
-    'HI2cIn  CTR, (b22)
-    ;CTR_A2IE  = 1
-    ;CTR_INTCN = 1
-    ;CTR_RS1 = 0
-    ;CTR_RS2 = 0
-    
-#EndMacro
+b23 = $12         ' bit7 = 0
+b24 = $1         ' bit7 = 0
+b25 = %10000000 ' bit7 = 1
 
-;#Define A2_EVERY_M()     A2(%1111,0,0,0) ; per minute
-;#Define A2_M(m)          A2(%1110,0,0,m) ; minutes match
-#Define A2_HM(h, m)       set_alarm2(h, m) ; hours and minutes match
-;#Define A2_DAY_HM(d,h,m) A2(%0000,d,h,m) ; day, hours and minutes match
-;#Define A2_DOW_HM(w,h,m) A2(%1000,w,h,m) ; day of week, hours and minutes match
-low B.2
+b23 = bintobcd b23
+b24 = bintobcd b24
+HI2cOut DAT_A2, (b23, b24, b25)
+HI2cOut $0B, (%10000000, %10000000, %10000000)
 
-A2_HM($12, $1) ; Alarm 2 at 12:01
 hintsetup   %00000001 ' Int on all 3 pins, INT0, INT1, INT2 = B.0, B.1, B.2
 setintflags %00000001,%00000001 ' Int on any pin 0,1,2
 
@@ -102,7 +88,7 @@ main_menu:
         "----------------", CR, _
         "1       | Return value at b0", CR, _
         "2       | Set Clock/Alarm", CR, _
-        "4       | Display Time", CR, _
+        "4       | Display Alarm", CR, _
         "5       | alarm_monitor", CR, _
         "6       | Display alarm bus", CR, _
         "254     | Reset picaxe", CR, CR)
@@ -114,9 +100,9 @@ main_menu:
     elseif b0 = 2 then
         gosub set_clock ' Set Time/Alarm
     elseif b0 = 4 then
-        gosub display_time ' Display Time/Alarm
+        gosub display_alarm2 ' Display Time/Alarm
     elseif b0 = 5 then
-        gosub alarm_monitor ' Display Time/Alarm
+        gosub alarm_monitor
     elseif b0 = 6 then
         gosub read_alarm_bus
     elseif b0 = 254 then
@@ -213,29 +199,9 @@ enter_clock_time:
         return
     endif
 
-;display_time:
-;' Display Time/Alarm to terminal
-;    serTXD ("Display: 1 = Time 2 = Alarm", CR, LF)
-;    serRXD b0
-;    ptr = 0
-;    if b0 = 2 then
-;        serTXD ("Current alarm is: ")
-;        HI2Cin  DAT_A2, (minute, hour, date)
-;    elseif b0 = 1 then
-;        serTXD ("Current time is: ")
-;        HI2Cin  1, (minute, hour, @ptr, date, month, year)
-;    else
-;        serTXD ("Invalid entry", CR, LF)
-;        return
-;    endif
-;    gosub rtc_to_ascii
-;    sertxd ("20", year_b1, year_b0, "/", month_b1, month_b0, "/", date_b1, date_b0, " ", hour_b1, hour_b0, ":", minute_b1, minute_b0, CR, LF)
-;  return
-
-display_time: 
+display_alarm2: 
     hi2cin DAT_A2, (minute, hour)
     sertxd (#minute, ":", #hour)
-    
     return
 
 interrupt:
