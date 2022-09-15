@@ -73,7 +73,6 @@ symbol i = b55  ' use in counter loops only
 
 ' Initialize this every time picaxe is turned off/on, reset, or reprogrammed.
 init:
-    'gosub init_clock ' Establish RTC
     servo outlet_IO, 250  ' Close outlet
     servo servo_IO, 255  ' Close main servo
     let pump_runtime = 1  ' Default manifold flush time
@@ -81,11 +80,12 @@ init:
     let pulse_time_OFF = 900 ' pump time off when pulsing
     let sample_pulses = 1 ' How many times to pulse pump when taking sample
 
-    HI2Csetup I2Cmaster, $D0, I2Cslow, I2Cbyte ' $D0 is DS3231 address on picaxe
-    hi2cout CTR, (%00000110) ' Enable INTCN and Alarm2
-    hi2cout STS, (%00001000) ' Clear Status register
-    hi2cout $0D, (%10000000) ' A2M4 bit 7 = 1, Alarm2 active when HH:MM == Clock HH:MM i.e. activate sampler once per day then sleep
-    hintsetup   %00000000 ' Disable interrupts to allow user interface until sampling begins.
+    gosub init_clock ' Establish RTC
+    'HI2Csetup I2Cmaster, $D0, I2Cslow, I2Cbyte ' $D0 is DS3231 address on picaxe
+    'hi2cout CTR, (%00000110) ' Enable INTCN and Alarm2
+    'hi2cout STS, (%00001000) ' Clear Status register
+    'hi2cout $0D, (%10000000) ' A2M4 bit 7 = 1, Alarm2 active when HH:MM == Clock HH:MM i.e. activate sampler once per day then sleep
+    'hintsetup   %00000000 ' Disable interrupts to allow user interface until sampling begins.
 
     ' REMOVE IN FINAL VERSION!  Only for testing purposes
     let minute = $1
@@ -95,7 +95,7 @@ init:
     let month = $6
     let year = $22
     hi2cout clock_reg,($01 , minute, hour, day, date, month, year) ' Set Time
-    hi2cout alarm2_reg, (%10000101, %10010011, %10000000) ' Set the alarm to go off every minute regardless of alarm time
+    'hi2cout alarm2_reg, (%10000000, %10000000, %10000000) ' Set the alarm to go off every minute regardless of alarm time
 
 clear_terminal:
     serTXD (CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR)
@@ -113,8 +113,8 @@ main_menu:
         "3       | Display Time", CR, _
         "4       | Display Alarm", CR, _
         "5       | Load sample data", CR, _
-        "6       | Save sanple data", CR, _
         "7       | Program picaxe variables", CR, _
+        "8       | Read alarm bus", CR, _
         "9       | Begin Sampling", CR, _
         "254     | Reset picaxe", CR)
     serTXD ("Enter <command>:  ")
@@ -130,10 +130,13 @@ main_menu:
         gosub display_alarm2
     elseif enter = 5 then
         gosub load_data
-    elseif enter = 6 then
-        gosub save_data
+;    elseif enter = 6 then
+;        "6       | Save sample data", CR, _
+;        gosub save_data
     elseif enter = 7 then
         gosub enter_prog_var
+    elseif enter = 8 then
+        gosub read_alarm_bus
     elseif enter = 9 then
         gosub begin_sampling
     elseif enter = 254 then
@@ -209,6 +212,7 @@ begin_sampling:
     let mem_index2 = 0 ' Initial mem_index2 value
     let write_count = 0 ' Initial write_count value
 
+    gosub display_time
     serTXD (CR, "---Begin Sampling---", CR, LF)
     serTXD ("Enter start Hour ex: 09", CR)
     serRXD a2_hour
@@ -220,6 +224,9 @@ begin_sampling:
     a2_minute = bintobcd a2_minute
     a2_hour = bintobcd a2_hour
     hi2cout alarm2_reg, (a2_minute, a2_hour, %10000000) ' Set Alarm
+    'gosub init_clock
+
+    flag0 = 0
     hintsetup   %00000001 ' Setup watch for interrupt on pin B.0
     setintflags %00000001,%00000001 ' Interrupt conditions: Int on pin B.0 going high
     gosub display_alarm2
@@ -227,11 +234,30 @@ begin_sampling:
     ' When the RTC alarm activates it interrupts the sleep and goes directly to the interrupt subroutine
     ' After the interrupt routine completes, it returns to this loop and sleeps again until the alarm activates again and repeats
     ' After final sample is taken, the program will sleep until reset by user to download data
-    do
-        serTXD (CR, "Sleeping", CR)
-        sleep 0
-    loop
+    return
+;    do
+;        serTXD (CR, "Sleeping", CR)
+;        sleep 0
+;    loop
 
+read_alarm_bus:
+    hi2cin CTR, (b0)
+    sertxd("CTR: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+    
+    hi2cin STS, (b0)
+    sertxd("STS: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+
+    hi2cin $0B, (b0)
+    sertxd("MM: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+
+    hi2cin $0C, (b0)
+    sertxd("HH: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+
+    hi2cin $0D, (b0)
+    sertxd("DD: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+    
+    return
+    
 init_clock:
     ' May not use this sub
     hi2csetup i2cmaster, $D0, i2cslow, i2cbyte ' $D0 is DS3231 address on picaxe
@@ -460,15 +486,20 @@ save_data:
 
 load_data:
     ' Load sample data from eeprom
-    ptr = 0
-    for i=0 to mem_index2
-        read i, @ptrinc ' read variable at eeprom address 0, copy that value to scratchpad, repeat to  eeprom address n (mem_index2).
-    next i
-    ptr = 0
-    for i=1 to write_count ' Display data recorded to eeprom
-        sertxd ("20", @ptrinc, @ptrinc, "/", @ptrinc, @ptrinc, "/", @ptrinc, @ptrinc, " ", @ptrinc, @ptrinc, ":", @ptrinc, @ptrinc, CR, LF)
-    next i
-    return
+    if write_count = 0 then
+        serTXD ("No sample data recorded.")
+        return
+    else
+        ptr = 0
+        for i=0 to mem_index2
+            read i, @ptrinc ' read variable at eeprom address 0, copy that value to scratchpad, repeat to  eeprom address n (mem_index2).
+        next i
+        ptr = 0
+        for i=1 to write_count ' Display data recorded to eeprom
+            sertxd ("20", @ptrinc, @ptrinc, "/", @ptrinc, @ptrinc, "/", @ptrinc, @ptrinc, " ", @ptrinc, @ptrinc, ":", @ptrinc, @ptrinc, CR, LF)
+        next i
+        return
+    endif
 
 ' Program logic subroutines
 collect_sample:
