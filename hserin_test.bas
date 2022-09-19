@@ -8,9 +8,10 @@ setfreq m8
 
 ' Pin assignments
 ' B.0 used for monitoring RTC alarm via interrupts
+' B.1 is empty
 symbol servo_IO = B.2
 symbol outlet_IO = B.3
-symbol subsamp = 2 ' Number of subsamples to take.
+symbol subsamp = 2 ' Number of subsamples to take.  Subsamples are taken daily
 
 ' DS3231 RTC registers
 symbol clock_reg = $00 ' Clock register start SS -> MM -> HH -> DAY (Sunday=1) -> Date -> MoMo -> YY
@@ -113,13 +114,14 @@ main_menu:
         "3       | Display Time", CR, _
         "4       | Display Alarm", CR, _
         "5       | Load sample data", CR, _
-        "7       | Program picaxe variables", CR, _
-        "8       | Read alarm bus", CR, _
-        "9       | Begin Sampling", CR, _
-        "254     | Reset picaxe", CR)
+        "6       | Program picaxe variables", CR, _
+        "7       | Read alarm bus", CR, _
+        " 8  save test data", CR, _
+        "91      | Begin Sampling", CR, _
+        "254     | Reprogram picaxe", CR)
     serTXD ("Enter <command>:  ")
     serRXD enter
-    serTXD (enter, CR, CR, LF)
+    serTXD (#enter, CR, CR, LF)
     if enter = 1 then
         goto testing_menu
     elseif enter = 2 then
@@ -130,22 +132,22 @@ main_menu:
         gosub display_alarm2
     elseif enter = 5 then
         gosub load_data
-;    elseif enter = 6 then
-;        "6       | Save sample data", CR, _
-;        gosub save_data
-    elseif enter = 7 then
+    elseif enter = 6 then
         gosub enter_prog_var
-    elseif enter = 8 then
+    elseif enter = 7 then
         gosub read_alarm_bus
-    elseif enter = 9 then
+    elseif enter = 8 then
+        gosub save_routine
+    elseif enter = 91 then
         gosub begin_sampling
     elseif enter = 254 then
+        serTXD ("Reprogram picaxe now...")
         do
             reconnect
             serin 6, N9600, b2
         loop
     else
-        serTXD (CR, "Invalid input:  ", enter, CR, LF)
+        serTXD (CR, "Invalid input:  ", #enter, CR, LF)
     endif
     goto main_menu
 
@@ -164,7 +166,7 @@ testing_menu:
         "254     | Reset picaxe", CR, CR)
     serTXD ("Enter <command>:  ")
     serRXD enter
-    serTXD (enter, CR)
+    serTXD (#enter, CR)
     if enter = 1 then  ' Manifold flush
         gosub enter_pump_time
         gosub manifold_flush
@@ -200,7 +202,7 @@ testing_menu:
     elseif enter = 99 then  ' Return to main menu
         goto main_menu
     else  ' Invalid input
-        serTXD (CR, "Invalid input:  ", enter, CR, LF)
+        serTXD (CR, "Invalid input:  ", #enter, CR, LF)
     endif
     goto testing_menu
 
@@ -208,58 +210,39 @@ begin_sampling:
     ' Begin sampling program
     let subsample_count = subsamp ' 1 subsample = 1 day
     let sample_set = 1 ' 1-4 sets RA/FA
-    let mem_index1 = 246 ' Initial mem_index1 value, 255+10=9
+    let mem_index1 = 246 ' Initial mem_index1 value, Note: 255+10=9, not 265
     let mem_index2 = 0 ' Initial mem_index2 value
     let write_count = 0 ' Initial write_count value
 
     gosub display_time
-    serTXD (CR, "---Begin Sampling---", CR, LF)
+    serTXD (CR, "--- Enter Start Time ---", CR, LF)
     serTXD ("Enter start Hour ex: 09", CR)
     serRXD a2_hour
     serTXD ("Enter start Minute ex: 05", CR)
     serRXD a2_minute
-    'serTXD ("Sampling will begin at: ", #a2_hour, ":", #a2_minute, CR)
     gosub display_time
 
     a2_minute = bintobcd a2_minute
     a2_hour = bintobcd a2_hour
     hi2cout alarm2_reg, (a2_minute, a2_hour, %10000000) ' Set Alarm
-    'gosub init_clock
+    gosub display_alarm2
 
     flag0 = 0
     hintsetup   %00000001 ' Setup watch for interrupt on pin B.0
     setintflags %00000001,%00000001 ' Interrupt conditions: Int on pin B.0 going high
-    gosub display_alarm2
-    pause 500
+    pause 100
     ' When the RTC alarm activates it interrupts the sleep and goes directly to the interrupt subroutine
     ' After the interrupt routine completes, it returns to this loop and sleeps again until the alarm activates again and repeats
     ' After final sample is taken, the program will sleep until reset by user to download data
+    
+    do
+        serTXD (CR, "Sleeping", CR)
+        sleep 0
+    loop
     return
-;    do
-;        serTXD (CR, "Sleeping", CR)
-;        sleep 0
-;    loop
 
-read_alarm_bus:
-    hi2cin CTR, (b0)
-    sertxd("CTR: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
-    
-    hi2cin STS, (b0)
-    sertxd("STS: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
-
-    hi2cin $0B, (b0)
-    sertxd("MM: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
-
-    hi2cin $0C, (b0)
-    sertxd("HH: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
-
-    hi2cin $0D, (b0)
-    sertxd("DD: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
-    
-    return
-    
 init_clock:
-    ' May not use this sub
+    ' Initialize RTC for picaxe
     hi2csetup i2cmaster, $D0, i2cslow, i2cbyte ' $D0 is DS3231 address on picaxe
     hi2cout CTR, (%00000110) ' Enable INTCN and Alarm2
     hi2cout STS, (%00001000) ' Clear Status register
@@ -279,7 +262,7 @@ set_clock:
         serRXD a2_hour
         serTXD ("minute ex: 05", CR)
         serRXD a2_minute
-        serTXD ("Alarm2 set to: ", #a2_hour, ":", #a2_minute, CR)
+        serTXD ("Alarm2 set to: ", a2_hour, ":", a2_minute, CR)
         a2_hour = bintobcd a2_hour
         a2_minute = bintobcd a2_minute
         hi2cout alarm2_reg,(a2_minute, a2_hour) ' Set Alarm on RTC
@@ -290,7 +273,7 @@ set_clock:
     return
 
 enter_clock_time:
-    ' Get input from user to enter Time/Alarm.
+    ' Get input from user to program RTC time.
     serTXD ("hour ex: 09", CR)
     serRXD hour
     serTXD ("minute ex: 05", CR)
@@ -303,7 +286,7 @@ enter_clock_time:
     serRXD date
     serTXD ("day ex: Monday = 2, Tuesday = 3", CR)
     serRXD day
-    serTXD ("Is this the correct time?: ", "20", #year, "/", #month, "/", #date, " ", #hour, ":", #minute, "  day = ", #day, CR)
+    serTXD ("Is this the correct time?: ", "20", year, "/", month, "/", date, " ", hour, ":", minute, "  day = ", #day, CR)
     serTXD ("1 = yes 0 = no")
     serRXD enter
     if enter = 0 then
@@ -323,7 +306,7 @@ enter_clock_time:
     endif
 
 display_time:
-' Display Time to terminal
+' Display current RTC time to terminal
     ptr = 0
     serTXD ("Current time is: ")
     hi2Cin  1, (minute, hour, @ptr, date, month, year)
@@ -336,7 +319,7 @@ display_time:
     return
 
 display_alarm2:
-' Display Alarm2 value to terminal
+' Display current alarm2 value to terminal.  Note alarm2 is programmed to go off once per day when Time HH:MM == Alarm2 HH:MM
     hi2Cin  alarm2_reg, (a2_minute, a2_hour)
     clearbit a2_hour, 7
     clearbit a2_minute, 7
@@ -347,7 +330,7 @@ display_alarm2:
 
 ' Get user input subroutines
 enter_prog_var:
-' pump needs seconds, convert here.  SerRXD can only receive values from 0-255
+    ' Get user input for programming sample pulses and pump manifold fluch time.  Note pump needs seconds and serRXD can only receive values from 0-255 so convert minutes to seconds
     serTXD (CR, "---Program picaxe variables---", CR, LF)
     serTXD ("Enter sample pulses: ", CR)
     serRXD sample_pulses
@@ -359,21 +342,21 @@ enter_prog_var:
 
 enter_pump_time:
     ' Get user input for pump runtime
-    serTXD ("Enter q<pump time>:  ", CR)
+    serTXD ("Enter <pump time>:  ", CR)
     serrxd pump_runtime
     serTXD ("Pumping ", #pump_runtime, " seconds", CR)
     return
 
 enter_pulses:
     ' Get user input for number of sample pulses
-    serTXD ("Enter q<pulses>:  ")
+    serTXD ("Enter <pulses>:  ")
     serrxd sample_pulses
     serTXD (#sample_pulses, CR)
     return
 
 enter_slot:
     ' Get user input for where to move main servo to
-    serTXD ("Move to slot q<0-8, 99=exit>:")
+    serTXD ("Move to slot <0-8, 99=exit>:")
     serRXD slot_num
     serTXD (#slot_num, CR)
     if slot_num = 99 then
@@ -428,24 +411,22 @@ move_servo:
     ' Always move to closed position before changing position
     serTXD ("Moving main servo to ", #slot_num, CR)
     servopos servo_IO, 255 ' Make sure servo is closed
-    'servo servo_IO, 255
-    pause 750 ' Wait for servo to move to closed position
+    pause 1500 ' Wait for servo to move to closed position
     gosub calc_servo_pos
     serTXD ("At position ", #servo_pos, CR)
-    'servo servo_IO, servo_pos
     servopos servo_IO, servo_pos ' Move servo to slot_num
-    pause 750 ' Wait for servo to move to slot_num
+    pause 1500 ' Wait for servo to move to slot_num
     return
 
 cpen_outlet:
-    ' Move outlet servo to open positoion
+    ' Move outlet servo to open position
     serTXD ("Opening outlet", CR)
     servopos Outlet_IO, 150
     pause 500
     return
 
 close_outlet:
-    ' Move outlet servo to open positoion
+    ' Move outlet servo to open position
     ' Closed is default position set in init.
     serTXD ("Closing outlet", CR)
     servopos Outlet_IO, 250
@@ -466,6 +447,7 @@ wet_filters:
 manifold_flush:
     ' Flush manifold
     servo servo_IO, 255  ' Close main servo
+    pause 1500
     gosub cpen_outlet
     serTXD ("Flushing manifold", CR)
     gosub run_pump
@@ -523,14 +505,31 @@ save_routine:
     gosub display_alarm2
     gosub save_data 'RA
     gosub save_data 'FA
-;    serTXD ("Sample set: ", #sample_set, CR)
-;    serTXD ("Subsamples left: ", #subsample_count, CR)
+    return
+
+read_alarm_bus:
+    ' Debug helper function.  Reads busses from RTC to verify control, status, and alarm time
+    hi2cin CTR, (b0)
+    sertxd("CTR: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+    
+    hi2cin STS, (b0)
+    sertxd("STS: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+
+    hi2cin $0B, (b0)
+    sertxd("MM: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+
+    hi2cin $0C, (b0)
+    sertxd("HH: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+
+    hi2cin $0D, (b0)
+    sertxd("DD: ", bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0, cr, lf )
+    
     return
 
 interrupt:
-' Main sampling program.  When alarm clock activates, enter this subroutine and collect samples
+' Main sampling program.  When alarm2 activates, enter this subroutine and collect samples
 ' interrupt is REQUIRED to be the last section of a picaxe program
-    ' When RTC alarm activates, run sample collection logic
+    ' When RTC alarm2 activates, run sample collection logic
     serTXD ("Waking", CR)
     if subsample_count = 0 then ' If all subsamples have been taken, move to next sample set
         inc sample_set ' Increment sample set by 1
@@ -567,7 +566,7 @@ interrupt:
     else ' If sample set >= 5, then end sampling by sleeping, turn off interrupts
         serTXD ("Sampling complete, entering sleep.", CR)
         setintflags %00000001,%00000000
-        gosub main_menu
+;        gosub main_menu ' Useful line for testing/debugging
     endif
 
     flag0 = 0 ' Clear flag 0
