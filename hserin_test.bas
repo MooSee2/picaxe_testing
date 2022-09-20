@@ -74,7 +74,7 @@ symbol i = b55  ' use in counter loops only
 
 ' Initialize this every time picaxe is turned off/on, reset, or reprogrammed.
 init:
-    servo outlet_IO, 250  ' Close outlet
+    servo outlet_IO, 200  ' Close outlet
     servo servo_IO, 255  ' Close main servo
     let pump_runtime = 1  ' Default manifold flush time
     let pulse_time_ON = 100 ' Pump time on when pulsing
@@ -171,14 +171,14 @@ testing_menu:
     serTXD ("Enter command:  ")
     serRXD enter
     serTXD (#enter, CR)
-    if enter = 1 then  ' Manifold flush
+    if enter = 1 then
         gosub enter_pump_time
         gosub manifold_flush
-    elseif enter = 2 then  ' Wet filters
+    elseif enter = 2 then
         serTXD ("Wet filters", CR)
         gosub enter_pulses
         gosub wet_filters
-    elseif enter = 3 then  ' Manual sample
+    elseif enter = 3 then
         serTXD ("Manual sample", CR)
         gosub close_outlet
         gosub enter_slot
@@ -187,14 +187,13 @@ testing_menu:
         pause 300
         servopos servo_IO, 255
         pause 750
-    elseif enter = 4 then ' Move servo to slot
+    elseif enter = 4 then
         do
-            ;gosub move_servo_test
             gosub enter_slot
         loop
-    elseif enter = 5 then  ' Open outlet
+    elseif enter = 5 then
         gosub cpen_outlet
-    elseif enter = 6 then  ' Close outlet
+    elseif enter = 6 then
         gosub close_outlet
 ;    elseif enter = 7 then  ' Pulse pump
 ;        gosub enter_pulses
@@ -202,7 +201,7 @@ testing_menu:
 ;    elseif enter = 8 then  ' Run pump
 ;        gosub enter_pump_time
 ;        gosub run_pump
-    elseif enter = 99 then  ' Return to main menu
+    elseif enter = 99 then
         goto main_menu
     else  ' Invalid input
         serTXD (CR, "Invalid input:  ", #enter, CR, LF)
@@ -386,23 +385,10 @@ move_servo:
     pause 1500 ' Wait for servo to move to slot_num
     return
 
-;move_servo_test:
-;    ' Move main servo to slot number.
-;    ' Always move to closed position before changing position
-;    'serTXD ("Moving main servo to ", #slot_num, CR)
-;    'servopos servo_IO, 255 ' Make sure servo is closed
-;    'pause 1500 ' Wait for servo to move to closed position
-;    'gosub calc_servo_pos
-;    serRXD servo_pos
-;    serTXD ("At position ", #servo_pos, CR)
-;    servopos servo_IO, servo_pos ' Move servo to slot_num
-;    'pause 1500 ' Wait for servo to move to slot_num
-;    return
-
 cpen_outlet:
     ' Move outlet servo to open position
     serTXD ("Opening outlet", CR)
-    servopos Outlet_IO, 150
+    servopos Outlet_IO, 100
     pause 500
     return
 
@@ -410,7 +396,7 @@ close_outlet:
     ' Move outlet servo to open position
     ' Closed is default position set in init.
     serTXD ("Closing outlet", CR)
-    servopos Outlet_IO, 250
+    servopos Outlet_IO, 200
     pause 500
     return
 
@@ -422,6 +408,7 @@ wet_filters:
         gosub move_servo
         gosub pulse_pump
     next slot_num
+    pause 100
     servopos servo_IO, 255
     return
 

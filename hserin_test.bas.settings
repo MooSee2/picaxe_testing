@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-16"?>
 <DocumentSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <FindHistory>
+    <string>wet_filters</string>
     <string>enter_slot</string>
     <string>display_alarm2</string>
     <string>sertxd</string>
@@ -10,7 +11,6 @@
     <string>B.0</string>
     <string>enter_clock_time</string>
     <string>alarm2_reg</string>
-    <string>mem_index2</string>
   </FindHistory>
   <ReplaceHistory>
     <string>enter =</string>
@@ -29,7 +29,7 @@
   <BreakPoints />
   <SelectedLine>0</SelectedLine>
   <SelectedColumn>0</SelectedColumn>
-  <CaretOffset>159</CaretOffset>
+  <CaretOffset>2528</CaretOffset>
   <BottomVerticalSplitterPosition>0</BottomVerticalSplitterPosition>
   <TopVerticalSplitterPosition>0</TopVerticalSplitterPosition>
   <HorizontalSplitterPosition>0</HorizontalSplitterPosition>
