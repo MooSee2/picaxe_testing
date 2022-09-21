@@ -11,6 +11,10 @@ setfreq m8
 ' B.1 is empty
 symbol servo_IO = B.2
 symbol outlet_IO = B.3
+symbol SAM1 = B.4
+symbol SAM3 = B.5
+symbol SAM5 = B.6
+symbol SAM7 = B.7
 symbol subsamp = 2 ' Number of subsamples to take.  Subsamples are taken daily
 
 ' DS3231 RTC registers
@@ -75,7 +79,11 @@ symbol i = b55  ' use in counter loops only
 ' Initialize this every time picaxe is turned off/on, reset, or reprogrammed.
 init:
     servo outlet_IO, 200  ' Close outlet
-    servo servo_IO, 255  ' Close main servo
+    servo SAM1, 200
+    servo SAM3, 200
+    servo SAM5, 200
+    servo SAM7, 200
+    'servo servo_IO, 255  ' Close main servo
     let pump_runtime = 1  ' Default manifold flush time
     let pulse_time_ON = 100 ' Pump time on when pulsing
     let pulse_time_OFF = 900 ' pump time off when pulsing
@@ -100,10 +108,41 @@ init:
     hi2cout clock_reg,($01 , minute, hour, day, date, month, year) ' Set Time
     'hi2cout alarm2_reg, (%10000000, %10000000, %10000000) ' Set the alarm to go off every minute regardless of alarm time
 
+#Macro open_samRA(sam)
+    servopos sam, 100
+    pause 500
+    #EndMacro
+
+#Macro open_samFA(sam)
+    servopos sam, 100
+    pause 500
+    #EndMacro
+
+#Macro close_sam(sam)
+    servopos sam, 200
+    pause 500
+    #EndMacro
+
+#Macro cpen_outlet(IO)
+    ' Move outlet servo to open position
+    serTXD ("Opening outlet", CR)
+    servopos IO, 100
+    pause 500
+    #EndMacro
+
+#Macro close_outlet(IO)
+    ' Move outlet servo to closed position
+    ' Closed is default position set in init.
+    serTXD ("Closing outlet", CR)
+    servopos IO, 200
+    pause 500
+    #EndMacro
+
 clear_terminal:
     serTXD (CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR, CR)
 
 main_menu:
+    cpen_outlet(outlet_IO)
     serTXD (CR, "--- Main Menu ---", CR)
     gosub display_time
     gosub display_alarm2
@@ -180,7 +219,7 @@ testing_menu:
         gosub wet_filters
     elseif enter = 3 then
         serTXD ("Manual sample", CR)
-        gosub close_outlet
+        close_outlet(outlet_IO)
         gosub enter_slot
         gosub enter_pulses
         gosub pulse_pump
@@ -192,15 +231,9 @@ testing_menu:
             gosub enter_slot
         loop
     elseif enter = 5 then
-        gosub cpen_outlet
+        cpen_outlet(outlet_IO)
     elseif enter = 6 then
-        gosub close_outlet
-;    elseif enter = 7 then  ' Pulse pump
-;        gosub enter_pulses
-;        gosub pulse_pump
-;    elseif enter = 8 then  ' Run pump
-;        gosub enter_pump_time
-;        gosub run_pump
+        close_outlet(outlet_IO)
     elseif enter = 99 then
         goto main_menu
     else  ' Invalid input
@@ -331,7 +364,7 @@ enter_slot:
     elseif slot_num > 8 then
         serTXD ("Invalid slot!", CR)
     elseif slot_num <= 8 then
-        gosub move_servo
+        'gosub move_servo
     endif
     return
 
@@ -361,51 +394,12 @@ pulse_pump:
     next i
     return
 
-'  Servo manipulation subroutines
-calc_servo_pos:
-    ' Calculates servo position in degrees
-    ' Slot 0 is closed position
-    if slot_num = 0 then
-        servo_pos = 255
-    else
-        temp = slot_num*25  ' Math is left to right, not PEMDOS and no ()
-        servo_pos = 255-temp-5
-    endif
-    return
-
-move_servo:
-    ' Move main servo to slot number.
-    ' Always move to closed position before changing position
-    serTXD ("Moving main servo to ", #slot_num, CR)
-    servopos servo_IO, 255 ' Make sure servo is closed
-    pause 1500 ' Wait for servo to move to closed position
-    gosub calc_servo_pos
-    serTXD ("At position ", #servo_pos, CR)
-    servopos servo_IO, servo_pos ' Move servo to slot_num
-    pause 1500 ' Wait for servo to move to slot_num
-    return
-
-cpen_outlet:
-    ' Move outlet servo to open position
-    serTXD ("Opening outlet", CR)
-    servopos Outlet_IO, 100
-    pause 500
-    return
-
-close_outlet:
-    ' Move outlet servo to open position
-    ' Closed is default position set in init.
-    serTXD ("Closing outlet", CR)
-    servopos Outlet_IO, 200
-    pause 500
-    return
-
 ' User testing subroutines
 wet_filters:
     ' Wet filters with n amount of sample pulses
-    gosub close_outlet
+    close_outlet(outlet_IO)
     for slot_num = 1 to 8 STEP 1
-        gosub move_servo
+        'gosub move_servo
         gosub pulse_pump
     next slot_num
     pause 100
@@ -416,10 +410,10 @@ manifold_flush:
     ' Flush manifold
     servo servo_IO, 255  ' Close main servo
     pause 1500
-    gosub cpen_outlet
+    cpen_outlet(outlet_IO)
     serTXD ("Flushing manifold", CR)
     gosub run_pump
-    gosub close_outlet
+    close_outlet(outlet_IO)
     return
 
 'Save/Load subroutines
@@ -455,7 +449,7 @@ load_data:
 ' Program logic subroutines
 collect_sample:
     ' Collect sample logic.  Responsible for collecting 1 sample.
-    gosub move_servo ' Move servo to slot_num location
+    'gosub move_servo ' Move servo to slot_num location
     gosub pulse_pump ' Pulse pump the number in sample_pulses times to collect subsample
     return
 
@@ -466,7 +460,7 @@ collect_subsample:
     inc slot_num
     gosub collect_sample ' Colllect FA
     slot_num = 0
-    gosub move_servo ' Return servo to slot 0, closed position.
+    'gosub move_servo ' Return servo to slot 0, closed position.
     return
 
 save_routine:
